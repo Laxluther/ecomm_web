@@ -1,0 +1,36 @@
+Flask
+Flask-CORS
+Flask-Caching
+mysql-connector-python
+PyJWT
+Werkzeug
+python-dotenv
+Pillow
+email-validator
+requests
+gunicorn
+redis
+flask-shell-ipython
+
+# Image Processing and File Handling
+Pillow
+python-magic
+filetype
+
+# Additional utilities for production
+python-dateutil
+tzdata
+
+
+
+# Security enhancements
+bcrypt
+cryptography
+
+# Performance monitoring (optional)
+flask-limiter
+prometheus-flask-exporter
+
+# Additional email functionality
+jinja2
+markupsafe

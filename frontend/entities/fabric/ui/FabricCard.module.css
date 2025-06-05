@@ -1,0 +1,137 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+  background-color: var(--background-color);
+  position: relative;
+}
+
+.card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-md);
+}
+
+.imageContainer {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform var(--transition-normal);
+}
+
+.card:hover .image {
+  transform: scale(1.05);
+}
+
+.content {
+  padding: var(--spacing-md);
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  margin-bottom: var(--spacing-xs);
+  color: var(--text-color);
+}
+
+.collection {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-md);
+}
+
+.actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: auto;
+}
+
+.addToCartButton {
+  flex: 1;
+}
+
+.favoriteButton {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.favoriteActive {
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+/* Стили для модального окна с полноразмерным изображением */
+.fullImageModal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.9);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.fullImageContainer {
+  position: relative;
+  max-width: 90%;
+  max-height: 90%;
+}
+
+.fullImage {
+  max-width: 100%;
+  max-height: 90vh;
+  object-fit: contain;
+}
+
+.closeButton {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  z-index: 2001;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .imageContainer {
+    height: 150px;
+  }
+
+  .title {
+    font-size: var(--font-size-sm);
+  }
+
+  .collection {
+    font-size: var(--font-size-xs);
+  }
+}

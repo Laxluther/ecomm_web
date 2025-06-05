@@ -1,0 +1,116 @@
+.tabs {
+  margin-top: 2rem;
+}
+
+.variantsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2rem;
+  margin-top: 1.5rem;
+}
+
+.sortComponent {
+  margin-bottom: 1.5rem;
+}
+
+.specsContainer {
+  padding: 1.5rem;
+  background-color: #f8fafc;
+  border-radius: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.specsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.specsTable th,
+.specsTable td {
+  padding: 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.specsTable th {
+  font-weight: 600;
+  color: #4a5568;
+  width: 40%;
+}
+
+.specsTable td {
+  color: #1a202c;
+}
+
+.applicationAreas {
+  margin-top: 2rem;
+}
+
+.applicationTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #2d3748;
+}
+
+.applicationList {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+.applicationItem {
+  margin-bottom: 0.5rem;
+  color: #4a5568;
+}
+
+.careContainer {
+  padding: 1.5rem;
+  background-color: #f8fafc;
+  border-radius: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.careList {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+}
+
+.careItem {
+  margin-bottom: 0.75rem;
+  color: #4a5568;
+  line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+  .variantsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.5rem;
+  }
+
+  .specsTable th {
+    width: 50%;
+  }
+}
+
+@media (max-width: 480px) {
+  .variantsGrid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .specsTable th,
+  .specsTable td {
+    display: block;
+    width: 100%;
+  }
+
+  .specsTable th {
+    padding-bottom: 0.25rem;
+    border-bottom: none;
+  }
+
+  .specsTable td {
+    padding-top: 0.25rem;
+    padding-bottom: 1rem;
+  }
+}

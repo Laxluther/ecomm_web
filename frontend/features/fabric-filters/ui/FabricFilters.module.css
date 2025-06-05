@@ -1,0 +1,218 @@
+.filtersContainer {
+  background-color: #f8fafc;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: var(--spacing-lg);
+  overflow: hidden;
+}
+
+.filtersHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.filtersTitle {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  color: #1a202c;
+}
+
+.resultsCount {
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+.toggleButton {
+  display: none;
+  align-items: center;
+  gap: var(--spacing-xs);
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.toggleIcon {
+  transition: transform var(--transition-fast);
+}
+
+.toggleIcon.open {
+  transform: rotate(180deg);
+}
+
+.filtersContent {
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.filterGroup {
+  margin-bottom: 1.5rem;
+}
+
+.filterGroupTitle {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  color: #4a5568;
+}
+
+.filterOptions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filterOption {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.filterInput {
+  margin-right: 0.5rem;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+}
+
+.filterLabel {
+  font-size: 0.875rem;
+  color: #4a5568;
+}
+
+.filterActions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.resetButton {
+  flex: 1;
+}
+
+.applyButton {
+  flex: 1;
+}
+
+.activeFilters {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.activeFiltersTitle {
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  color: #4a5568;
+}
+
+.activeFiltersList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.activeFilterTag {
+  display: flex;
+  align-items: center;
+  background-color: #edf2f7;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #4a5568;
+}
+
+.removeFilterButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-left: 0.25rem;
+  font-size: 1rem;
+  color: #718096;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 16px;
+  height: 16px;
+}
+
+.removeFilterButton:hover {
+  color: #e53e3e;
+}
+
+.clearAllButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: #4299e1;
+  padding: 0.25rem 0.5rem;
+  text-decoration: underline;
+}
+
+.clearAllButton:hover {
+  color: #2b6cb0;
+}
+
+@media (max-width: 768px) {
+  .toggleButton {
+    display: flex;
+  }
+
+  .filtersContent {
+    display: none;
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height var(--transition-normal), padding var(--transition-normal);
+  }
+
+  .filtersContent.open {
+    display: flex;
+    padding: var(--spacing-md);
+    max-height: 1000px;
+  }
+
+  .filtersHeader {
+    flex-wrap: wrap;
+  }
+
+  .resultsCount {
+    order: 3;
+    width: 100%;
+    margin-top: var(--spacing-sm);
+  }
+
+  .filtersContainer {
+    padding: 15px;
+  }
+
+  .filtersTitle {
+    font-size: 1.125rem;
+    margin-bottom: 1rem;
+  }
+
+  .filterGroupTitle {
+    font-size: 0.875rem;
+  }
+
+  .filterLabel {
+    font-size: 0.8125rem;
+  }
+
+  .filterActions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+}

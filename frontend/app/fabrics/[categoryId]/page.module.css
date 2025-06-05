@@ -1,0 +1,92 @@
+.title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  color: #1a202c;
+}
+
+.description {
+  font-size: 1rem;
+  color: #4a5568;
+  margin-bottom: 2rem;
+  max-width: 800px;
+  line-height: 1.6;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.sidebar {
+  position: sticky;
+  top: 100px;
+  height: fit-content;
+}
+
+.toolsContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.sortComponent {
+  margin-left: auto;
+}
+
+.collectionsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 2rem;
+}
+
+.noCollections {
+  text-align: center;
+  padding: 3rem 0;
+  background-color: #f7fafc;
+  border-radius: 0.5rem;
+}
+
+.noCollections p {
+  font-size: 1.125rem;
+  color: #4a5568;
+  margin-bottom: 1.5rem;
+}
+
+@media (max-width: 1024px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    margin-bottom: 2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .title {
+    font-size: 1.75rem;
+  }
+
+  .collectionsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .title {
+    font-size: 1.5rem;
+  }
+
+  .collectionsGrid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+}

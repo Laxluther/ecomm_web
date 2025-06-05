@@ -1,0 +1,172 @@
+.title {
+  font-size: var(--font-size-3xl);
+  font-weight: 700;
+  margin: var(--spacing-xl) 0;
+  text-align: center;
+}
+
+/* Стили для пустого состояния */
+.emptyFavorites {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: var(--spacing-3xl) 0;
+  max-width: 600px;
+  margin: 0 auto;
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.emptyFavoritesIcon {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-lg);
+  opacity: 0.7;
+}
+
+.emptyFavoritesTitle {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  color: var(--text-color);
+}
+
+.emptyFavoritesText {
+  color: var(--text-secondary);
+  margin-bottom: var(--spacing-xl);
+  font-size: var(--font-size-md);
+  line-height: 1.5;
+}
+
+.emptyFavoritesActions {
+  display: flex;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* Стили для контента с избранными товарами */
+.favoritesContent {
+  margin-bottom: var(--spacing-3xl);
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+/* Стили для табов */
+.favoritesTabs {
+  display: flex;
+  margin-bottom: var(--spacing-xl);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.favoritesTabs::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.favoritesTab {
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-size: var(--font-size-md);
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.favoritesTab:hover {
+  color: var(--text-color);
+}
+
+.favoritesTab.activeTab {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+}
+
+/* Стили для секций */
+.favoritesSection {
+  margin-bottom: var(--spacing-2xl);
+}
+
+.sectionTitle {
+  font-size: var(--font-size-xl);
+  font-weight: 600;
+  margin-bottom: var(--spacing-lg);
+  color: var(--text-color);
+}
+
+/* Сетки для товаров */
+.furnitureGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.fabricsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+  .title {
+    font-size: var(--font-size-2xl);
+    margin: var(--spacing-lg) 0;
+  }
+
+  .emptyFavoritesTitle {
+    font-size: var(--font-size-lg);
+  }
+
+  .emptyFavoritesActions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .emptyFavoritesActions a {
+    width: 100%;
+  }
+
+  .favoritesTabs {
+    padding-bottom: var(--spacing-xs);
+  }
+
+  .favoritesTab {
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+  }
+
+  .sectionTitle {
+    font-size: var(--font-size-lg);
+    margin-bottom: var(--spacing-md);
+  }
+
+  .furnitureGrid,
+  .fabricsGrid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: var(--spacing-md);
+  }
+}
+
+@media (max-width: 480px) {
+  .furnitureGrid,
+  .fabricsGrid {
+    grid-template-columns: 1fr;
+  }
+}

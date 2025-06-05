@@ -1,0 +1,88 @@
+.sortContainer {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sortLabel {
+  font-weight: 500;
+  margin-right: 1rem;
+  color: #333;
+}
+
+.sortOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sortOption {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  background: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.sortOption:hover {
+  background-color: #f7fafc;
+}
+
+.sortOption.active {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+  font-weight: 500;
+}
+
+.sortDropdown {
+  display: none;
+  position: relative;
+}
+
+.sortSelect {
+  appearance: none;
+  padding: 0.5rem 2rem 0.5rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.25rem;
+  background-color: white;
+  cursor: pointer;
+  font-size: 0.875rem;
+  width: 100%;
+}
+
+.sortDropdownIcon {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+/* Мобильная версия */
+@media (max-width: 768px) {
+  .sortOptions {
+    display: none;
+  }
+
+  .sortDropdown {
+    display: block;
+    width: 100%;
+    max-width: 250px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sortContainer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sortDropdown {
+    width: 100%;
+    max-width: 100%;
+  }
+}

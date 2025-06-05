@@ -1,0 +1,189 @@
+.heroSection {
+  position: relative;
+  overflow: hidden;
+  height: 600px;
+}
+
+.sliderContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sliderTrack {
+  display: flex;
+  transition: transform 0.6s ease;
+  height: 100%;
+}
+
+.slide {
+  flex: 0 0 100%;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.slideBackground {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: brightness(0.8);
+}
+
+.content {
+  position: relative;
+  z-index: 2;
+  max-width: 600px;
+  padding: var(--spacing-3xl) 0;
+  color: white;
+  animation: fadeIn 0.8s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.title {
+  font-size: var(--font-size-4xl);
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: var(--spacing-lg);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.description {
+  font-size: var(--font-size-lg);
+  line-height: 1.6;
+  margin-bottom: var(--spacing-xl);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.actions {
+  margin-top: var(--spacing-md);
+}
+
+.sliderButton {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.8);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-md);
+}
+
+.sliderButton:hover {
+  background-color: var(--accent-color);
+  color: white;
+}
+
+.prevButton {
+  left: 20px;
+}
+
+.nextButton {
+  right: 20px;
+}
+
+.sliderDots {
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--spacing-sm);
+  z-index: 10;
+}
+
+.sliderDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.5);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.sliderDot.active {
+  background-color: var(--accent-color);
+  transform: scale(1.2);
+}
+
+@media (max-width: 1024px) {
+  .heroSection {
+    height: 500px;
+  }
+
+  .title {
+    font-size: var(--font-size-3xl);
+  }
+
+  .description {
+    font-size: var(--font-size-md);
+  }
+}
+
+@media (max-width: 768px) {
+  .heroSection {
+    height: 450px;
+  }
+
+  .content {
+    text-align: center;
+    padding: var(--spacing-xl) var(--spacing-md);
+    margin: 0 auto;
+  }
+
+  .title {
+    font-size: var(--font-size-2xl);
+  }
+
+  .sliderButton {
+    width: 40px;
+    height: 40px;
+  }
+
+  .prevButton {
+    left: 10px;
+  }
+
+  .nextButton {
+    right: 10px;
+  }
+}
+
+@media (max-width: 576px) {
+  .heroSection {
+    height: 400px;
+  }
+
+  .title {
+    font-size: var(--font-size-xl);
+  }
+
+  .description {
+    font-size: var(--font-size-sm);
+  }
+}
