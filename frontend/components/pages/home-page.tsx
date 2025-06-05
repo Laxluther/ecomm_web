@@ -175,7 +175,7 @@ export function HomePage() {
       <section className="py-16 bg-emerald-800 text-white">
         <div className="container mx-auto px-4">
           <div className="max-w-xl mx-auto text-center">
-            <h2 className="text-2xl font-bold mb-4">Join Our Forest Community</h2>
+            <h2 className="text-2xl font-bold mb-4">Join Our farm Community</h2>
             <p className="mb-6">
               Subscribe to our newsletter and receive exclusive offers, early access to new products, and wellness tips.
             </p>

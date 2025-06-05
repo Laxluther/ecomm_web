@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAuthStore } from "@/lib/store"
-import { adminApi } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
+import { adminAPI } from "@/lib/api"
 import toast from "react-hot-toast"
 import { Eye, EyeOff, Shield } from "lucide-react"
 
@@ -18,7 +18,7 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const { setAdmin } = useAuthStore()
+  const { adminLogin } = useAuth()
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,13 +26,10 @@ export default function AdminLoginPage() {
     setIsLoading(true)
 
     try {
-      const response = await adminApi.post("/auth/login", {
-        username,
-        password,
-      })
-
+      const response = await adminAPI.login(username, password)
       const { token, admin } = response.data
-      setAdmin(admin, token)
+
+      adminLogin(token, admin)
       toast.success("Admin login successful! Welcome to the admin panel!")
       router.push("/admin")
     } catch (error: any) {

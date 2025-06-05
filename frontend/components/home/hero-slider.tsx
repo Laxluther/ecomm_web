@@ -19,14 +19,14 @@ export function HeroSlider() {
   const slides: Slide[] = [
     {
       image: "/images/hero-banner-1.png",
-      title: "Pure Forest Treasures",
-      subtitle: "Discover nature's finest honey, coffee, nuts and seeds sourced directly from pristine forests.",
+      title: "Pure farm Treasures",
+      subtitle: "Discover nature's finest honey, coffee, nuts and seeds sourced directly from pristine farms.",
       cta: "Explore Collection",
       link: "/shop",
     },
     {
       image: "/images/hero-banner-2.png",
-      title: "From Forest to Your Table",
+      title: "From farm to Your Table",
       subtitle: "Experience the authentic taste of nature with our premium organic products.",
       cta: "Shop Now",
       link: "/shop",

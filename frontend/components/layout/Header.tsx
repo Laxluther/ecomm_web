@@ -85,10 +85,10 @@ export function Header() {
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-3">
             <div className="relative w-12 h-12">
-              <Image src="/images/squirrel-logo.png" alt="Forest Store Logo" fill className="object-contain" />
+              <Image src="/images/squirrel-logo.png" alt="lorem ipsum Logo" fill className="object-contain" />
             </div>
             <div className="flex flex-col">
-              <span className="font-bold text-2xl text-emerald-800 tracking-wide">Forest Store</span>
+              <span className="font-bold text-2xl text-emerald-800 tracking-wide">lorem ipsum</span>
               <span className="text-xs text-emerald-600 -mt-1">Natural & Pure</span>
             </div>
           </Link>

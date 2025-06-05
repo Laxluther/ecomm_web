@@ -12,7 +12,7 @@ export default function AboutPage() {
       <div className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 mb-6">About Forest Store</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-6">About lorem ipsum</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
             We're passionate about bringing you the finest natural products directly from pristine forests and organic
             farms. Our mission is to connect you with nature's purest offerings while supporting sustainable farming
@@ -26,7 +26,7 @@ export default function AboutPage() {
             <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Story</h2>
             <div className="space-y-4 text-gray-600">
               <p>
-                Founded in 2020, Forest Store began as a small family business with a simple vision: to share the
+                Founded in 2020, lorem ipsum began as a small family business with a simple vision: to share the
                 incredible bounty of nature with health-conscious consumers who value quality and authenticity.
               </p>
               <p>

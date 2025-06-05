@@ -26,7 +26,7 @@ export function BundleSection() {
                 <Leaf className="h-5 w-5 text-amber-600 mr-2" />
                 <h3 className="font-semibold text-lg">Honey Collection</h3>
               </div>
-              <p className="text-gray-600 mb-4">Our premium honey selection sourced from pristine forests.</p>
+              <p className="text-gray-600 mb-4">Our premium honey selection sourced from pristine farms.</p>
               <Button asChild variant="outline" className="w-full">
                 <Link href="/shop?category=1">
                   Explore <ArrowRight className="ml-2 h-4 w-4" />

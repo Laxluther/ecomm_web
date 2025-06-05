@@ -51,12 +51,12 @@ export default function ReferralsPage() {
   }
 
   const shareReferral = () => {
-    const text = `Join Forest Store and get premium natural products! Use my referral code ${referralData?.referral_code} and get ₹50 bonus on your first purchase!`
+    const text = `Join lorem ipsum and get premium natural products! Use my referral code ${referralData?.referral_code} and get ₹50 bonus on your first purchase!`
     const link = `${window.location.origin}/register?ref=${referralData?.referral_code}`
 
     if (navigator.share) {
       navigator.share({
-        title: "Join Forest Store",
+        title: "Join lorem ipsum",
         text: text,
         url: link,
       })
@@ -295,7 +295,7 @@ export default function ReferralsPage() {
                 <p>• Minimum order value of ₹500 required</p>
                 <p>• Bonus expires after 90 days if unused</p>
                 <p>• Cannot be combined with other offers</p>
-                <p>• Forest Store reserves the right to modify terms</p>
+                <p>• lorem ipsum reserves the right to modify terms</p>
               </CardContent>
             </Card>
           </div>

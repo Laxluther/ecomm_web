@@ -131,10 +131,13 @@ export const authAPI = {
     const response = await api.post("/auth/reset-password", { token, password, confirm_password })
     return response.data
   },
+}
 
-  adminLogin: async (username: string, password: string) => {
+// Admin Authentication
+export const adminAPI = {
+  login: async (username: string, password: string) => {
     const response = await adminApi.post("/auth/login", { username, password })
-    return response.data
+    return response
   },
 }
 
