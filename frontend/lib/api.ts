@@ -1,205 +1,315 @@
+import axios from "axios"
+
+// API Configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
 
-interface ApiResponse<T = any> {
-  data?: T
-  error?: string
-  message?: string
-}
+// Create axios instances
+export const api = axios.create({
+  baseURL: `${API_BASE_URL}/user`,
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+})
 
-interface WalletData {
-  balance: number
-  transactions: Array<{
-    id: string
-    type: "credit" | "debit"
-    amount: number
-    description: string
-    date: string
-    status: "completed" | "pending" | "failed"
-  }>
-}
+export const adminApi = axios.create({
+  baseURL: `${API_BASE_URL}/admin`,
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+})
 
-interface CheckoutSummary {
-  subtotal: number
-  discount_amount: number
-  shipping_cost: number
-  tax_amount: number
-  total_amount: number
-  promocode_applied: boolean
-  promocode_description?: string
-  promocode_discount_percentage?: number
-  promocode_discount_amount?: number
-  free_shipping: boolean
-}
+export const publicApi = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
+  headers: {
+    "Content-Type": "application/json",
+  },
+})
 
-interface ProductsResponse {
-  products: Array<{
-    product_id: number
-    product_name: string
-    price: number
-    discount_price: number
-    primary_image: string
-    average_rating: number
-    total_reviews: number
-    savings: number
-    savings_percentage: number
-    in_stock: boolean
-    category_name: string
-    brand?: string
-    description: string
-  }>
-  pagination: {
-    page: number
-    pages: number
-    per_page: number
-    total: number
-  }
-}
-
-interface CategoriesResponse {
-  categories: Array<{
-    category_id: number
-    category_name: string
-    product_count: number
-  }>
-}
-
-class ApiClient {
-  private baseURL: string
-  private token: string | null = null
-
-  constructor() {
-    this.baseURL = API_BASE_URL
-    // Initialize token from localStorage if available
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
     if (typeof window !== "undefined") {
-      this.token = localStorage.getItem("auth_token")
-    }
-  }
-
-  setToken(token: string | null) {
-    this.token = token
-    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("token")
       if (token) {
-        localStorage.setItem("auth_token", token)
-      } else {
-        localStorage.removeItem("auth_token")
+        config.headers.Authorization = `Bearer ${token}`
       }
     }
-  }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  },
+)
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-    try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-        ...(options.headers as Record<string, string>),
-      }
-
-      // Add Authorization header if token exists
-      if (this.token) {
-        headers.Authorization = `Bearer ${this.token}`
-      }
-
-      const response = await fetch(`${this.baseURL}${endpoint}`, {
-        ...options,
-        headers,
-      })
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-      return { data }
-    } catch (error) {
-      console.error("API request failed:", error)
-      return { error: error instanceof Error ? error.message : "Unknown error" }
+// Response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("token")
+      localStorage.removeItem("user")
+      window.location.href = "/login"
     }
-  }
+    return Promise.reject(error)
+  },
+)
 
-  // Add authentication methods
-  async login(credentials: { email: string; password: string; remember_me?: boolean }): Promise<ApiResponse<any>> {
-    return this.request("/auth/login", {
-      method: "POST",
-      body: JSON.stringify(credentials),
-    })
-  }
-
-  async register(userData: any): Promise<ApiResponse<any>> {
-    return this.request("/auth/register", {
-      method: "POST",
-      body: JSON.stringify(userData),
-    })
-  }
-
-  async getCurrentUser(): Promise<ApiResponse<any>> {
-    return this.request("/auth/me")
-  }
-
-  // Wallet API
-  async getWallet(): Promise<ApiResponse<WalletData>> {
-    return this.request<WalletData>("/wallet")
-  }
-
-  async addMoneyToWallet(amount: number): Promise<ApiResponse<{ success: boolean }>> {
-    return this.request("/wallet/add", {
-      method: "POST",
-      body: JSON.stringify({ amount }),
-    })
-  }
-
-  // Products API
-  async getProducts(params: any = {}): Promise<ApiResponse<ProductsResponse>> {
-    const searchParams = new URLSearchParams()
-    Object.keys(params).forEach((key) => {
-      if (params[key] !== undefined && params[key] !== null) {
-        searchParams.append(key, params[key].toString())
+// Admin request interceptor
+adminApi.interceptors.request.use(
+  (config) => {
+    if (typeof window !== "undefined") {
+      const token = localStorage.getItem("adminToken")
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
       }
-    })
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  },
+)
 
-    return this.request<ProductsResponse>(`/products?${searchParams.toString()}`)
-  }
+// Admin response interceptor
+adminApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== "undefined") {
+      localStorage.removeItem("adminToken")
+      localStorage.removeItem("admin")
+      window.location.href = "/admin/login"
+    }
+    return Promise.reject(error)
+  },
+)
 
-  async getProduct(id: string): Promise<ApiResponse<any>> {
-    return this.request(`/products/${id}`)
-  }
+// API Functions
 
-  // Categories API
-  async getCategories(): Promise<ApiResponse<CategoriesResponse>> {
-    return this.request<CategoriesResponse>("/categories")
-  }
+// Authentication
+export const authAPI = {
+  login: async (email: string, password: string, remember_me = false) => {
+    const response = await api.post("/auth/login", { email, password, remember_me })
+    return response.data
+  },
 
-  // Checkout API
-  async getCheckoutSummary(params: { state_code?: string; promocode?: string }): Promise<ApiResponse<CheckoutSummary>> {
-    const searchParams = new URLSearchParams()
-    if (params.state_code) searchParams.append("state_code", params.state_code)
-    if (params.promocode) searchParams.append("promocode", params.promocode)
+  register: async (userData: {
+    email: string
+    password: string
+    first_name: string
+    last_name: string
+    phone: string
+    referral_code?: string
+  }) => {
+    const response = await api.post("/auth/register", userData)
+    return response.data
+  },
 
-    return this.request<CheckoutSummary>(`/checkout/summary?${searchParams.toString()}`)
-  }
+  verifyEmail: async (token: string) => {
+    const response = await api.post("/auth/verify-email", { token })
+    return response.data
+  },
 
-  // Orders API
-  async getOrders(): Promise<ApiResponse<any>> {
-    return this.request("/orders")
-  }
+  resendVerification: async (email: string) => {
+    const response = await api.post("/auth/resend-verification", { email })
+    return response.data
+  },
 
-  async getOrder(id: string): Promise<ApiResponse<any>> {
-    return this.request(`/orders/${id}`)
-  }
+  forgotPassword: async (email: string) => {
+    const response = await api.post("/auth/forgot-password", { email })
+    return response.data
+  },
 
-  async createOrder(orderData: any): Promise<ApiResponse<any>> {
-    return this.request("/orders", {
-      method: "POST",
-      body: JSON.stringify(orderData),
-    })
-  }
+  validateResetToken: async (token: string) => {
+    const response = await api.post("/auth/validate-reset-token", { token })
+    return response.data
+  },
 
-  // Featured Products API - Placeholder for your future implementation
-  async getFeaturedProducts(): Promise<ApiResponse<any>> {
-    // This will call your future featured products endpoint
-    // For now it will fail gracefully and show placeholder
-    return this.request("/products/featured")
-  }
+  resetPassword: async (token: string, password: string, confirm_password: string) => {
+    const response = await api.post("/auth/reset-password", { token, password, confirm_password })
+    return response.data
+  },
 
-  // Remove the old getFeaturedCategories since we're using all categories
+  adminLogin: async (username: string, password: string) => {
+    const response = await adminApi.post("/auth/login", { username, password })
+    return response.data
+  },
 }
 
-export const api = new ApiClient()
+// Products
+export const productsAPI = {
+  getFeatured: async () => {
+    const response = await api.get("/products/featured")
+    return response.data
+  },
+
+  getAll: async (params?: { category?: string; search?: string; page?: number; per_page?: number }) => {
+    const queryString = params ? new URLSearchParams(params as any).toString() : ""
+    const response = await api.get(`/products${queryString ? `?${queryString}` : ""}`)
+    return response.data
+  },
+
+  getById: async (id: string) => {
+    const response = await api.get(`/products/${id}`)
+    return response.data
+  },
+}
+
+// Categories
+export const categoriesAPI = {
+  getAll: async () => {
+    const response = await api.get("/categories")
+    return response.data
+  },
+}
+
+// Cart
+export const cartAPI = {
+  get: async () => {
+    const response = await api.get("/cart")
+    return response.data
+  },
+
+  add: async (product_id: number, quantity: number) => {
+    const response = await api.post("/cart/add", { product_id, quantity })
+    return response.data
+  },
+
+  update: async (product_id: number, quantity: number) => {
+    const response = await api.put("/cart/update", { product_id, quantity })
+    return response.data
+  },
+
+  remove: async (product_id: number) => {
+    const response = await api.delete(`/cart/remove/${product_id}`)
+    return response.data
+  },
+}
+
+// Addresses
+export const addressesAPI = {
+  getAll: async () => {
+    const response = await api.get("/addresses")
+    return response.data
+  },
+
+  add: async (addressData: any) => {
+    const response = await api.post("/addresses", addressData)
+    return response.data
+  },
+
+  update: async (id: number, addressData: any) => {
+    const response = await api.put(`/addresses/${id}`, addressData)
+    return response.data
+  },
+
+  delete: async (id: number) => {
+    const response = await api.delete(`/addresses/${id}`)
+    return response.data
+  },
+}
+
+// Referrals
+export const referralsAPI = {
+  validate: async (code: string) => {
+    const response = await api.post("/referrals/validate", { code })
+    return response.data
+  },
+
+  get: async () => {
+    const response = await api.get("/referrals")
+    return response.data
+  },
+}
+
+// Wallet
+export const walletAPI = {
+  get: async () => {
+    const response = await api.get("/wallet")
+    return response.data
+  },
+}
+
+// Wishlist
+export const wishlistAPI = {
+  get: async () => {
+    const response = await api.get("/wishlist")
+    return response.data
+  },
+
+  add: async (product_id: number) => {
+    const response = await api.post("/wishlist/add", { product_id })
+    return response.data
+  },
+
+  remove: async (product_id: number) => {
+    const response = await api.delete(`/wishlist/remove/${product_id}`)
+    return response.data
+  },
+}
+
+// Admin APIs
+export const adminProductsAPI = {
+  getAll: async (params?: { page?: number; per_page?: number }) => {
+    const queryString = params ? new URLSearchParams(params as any).toString() : ""
+    const response = await adminApi.get(`/products${queryString ? `?${queryString}` : ""}`)
+    return response.data
+  },
+
+  add: async (productData: any) => {
+    const response = await adminApi.post("/products", productData)
+    return response.data
+  },
+
+  update: async (id: number, productData: any) => {
+    const response = await adminApi.put(`/products/${id}`, productData)
+    return response.data
+  },
+
+  delete: async (id: number) => {
+    const response = await adminApi.delete(`/products/${id}`)
+    return response.data
+  },
+}
+
+export const adminDashboardAPI = {
+  getStats: async () => {
+    const response = await adminApi.get("/dashboard")
+    return response.data
+  },
+}
+
+export const adminCategoriesAPI = {
+  getAll: async () => {
+    const response = await adminApi.get("/categories")
+    return response.data
+  },
+}
+
+export const adminUsersAPI = {
+  getAll: async (params?: { page?: number; per_page?: number }) => {
+    const queryString = params ? new URLSearchParams(params as any).toString() : ""
+    const response = await adminApi.get(`/users${queryString ? `?${queryString}` : ""}`)
+    return response.data
+  },
+}
+
+export const adminOrdersAPI = {
+  getAll: async (params?: { page?: number; per_page?: number }) => {
+    const queryString = params ? new URLSearchParams(params as any).toString() : ""
+    const response = await adminApi.get(`/orders${queryString ? `?${queryString}` : ""}`)
+    return response.data
+  },
+}
+
+export const adminReferralsAPI = {
+  getAll: async (params?: { page?: number; per_page?: number }) => {
+    const queryString = params ? new URLSearchParams(params as any).toString() : ""
+    const response = await adminApi.get(`/referrals${queryString ? `?${queryString}` : ""}`)
+    return response.data
+  },
+}
+
+export default api

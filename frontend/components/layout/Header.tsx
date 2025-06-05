@@ -1,233 +1,194 @@
 "use client"
-import { useState } from "react"
+
+import type React from "react"
+
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ShoppingCart, User, Menu, X, Heart } from "lucide-react"
-import { useAuth } from "@/contexts/AuthContext"
-import { useWishlist } from "@/contexts/WishlistContext"
-import { useCart } from "@/contexts/CartContext"
-import { PromoBanner } from "./PromoBanner"
+import { ShoppingCart, User, Search, Heart, LogOut, X, Crown, Sparkles } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { useAuth } from "@/lib/auth"
+import { useCartStore } from "@/lib/store"
+import { useState, useEffect } from "react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge"
+import Image from "next/image"
 
 export function Header() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
-  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
-  const { user, logout } = useAuth()
-  const { items: wishlistItems } = useWishlist()
-  const { state: cartState } = useCart()
-  const router = useRouter()
+  const { user, isAuthenticated, logout } = useAuth()
+  const { getTotalItems } = useCartStore()
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showPremiumBanner, setShowPremiumBanner] = useState(true)
 
-  const handleLogout = () => {
-    logout()
-    router.push("/")
-    setIsAccountMenuOpen(false)
+  // Check if banner was previously dismissed
+  useEffect(() => {
+    const dismissed = localStorage.getItem("premiumBannerDismissed")
+    if (dismissed) {
+      setShowPremiumBanner(false)
+    }
+  }, [])
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      window.location.href = `/shop?search=${encodeURIComponent(searchQuery)}`
+    }
+  }
+
+  const dismissPremiumBanner = () => {
+    setShowPremiumBanner(false)
+    localStorage.setItem("premiumBannerDismissed", "true")
   }
 
   return (
-    <>
-      <PromoBanner />
-      <header className="bg-white shadow-sm border-b border-green-200">
-        <div className="container">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <Link href="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-green-600 to-green-800 rounded-lg flex items-center justify-center">
-                <img
-                  src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Screenshot%202025-06-03%20164205-7pEf7niidZCmRp5huUV9Bw8L1ZdRAI.png"
-                  alt="Logo"
-                  className="w-5 h-5 filter invert"
-                />
-              </div>
-              <span className="text-xl font-heading font-black text-green-800">LAURIUM IPSUM</span>
-            </Link>
-
-            {/* Navigation - Desktop */}
-            <nav className="hidden md:flex items-center space-x-8">
-              <Link href="/shop" className="text-green-800 hover:text-green-600 font-medium transition-colors">
-                Shop
-              </Link>
-              <Link href="/about" className="text-green-800 hover:text-green-600 font-medium transition-colors">
-                About
-              </Link>
-            </nav>
-
-            {/* Actions */}
-            <div className="flex items-center space-x-4">
-              {/* Wishlist */}
-              <Link
-                href="/wishlist"
-                className="flex items-center space-x-1 text-green-800 hover:text-green-600 transition-colors relative"
-              >
-                <div className="relative">
-                  <Heart className="h-5 w-5" />
-                  {wishlistItems.length > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                      {wishlistItems.length}
-                    </span>
-                  )}
+    <header className="bg-white shadow-sm">
+      {/* Premium Banner */}
+      {showPremiumBanner && (
+        <div className="bg-gradient-to-r from-emerald-600 via-emerald-700 to-emerald-800 text-white relative overflow-hidden">
+          <div className="absolute inset-0 bg-black/10"></div>
+          <div className="relative container mx-auto px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2">
+                  <Crown className="h-5 w-5 text-yellow-300" />
+                  <Sparkles className="h-4 w-4 text-yellow-300 animate-pulse" />
                 </div>
-                <span className="hidden sm:block text-sm">Wishlist</span>
-              </Link>
-
-              {/* Account */}
-              <div className="relative">
-                <button
-                  onClick={() => setIsAccountMenuOpen(!isAccountMenuOpen)}
-                  className="flex items-center space-x-1 text-green-800 hover:text-green-600 transition-colors"
+                <div>
+                  <span className="font-bold text-lg">🌿 PREMIUM FOREST COLLECTION</span>
+                  <span className="ml-3 text-emerald-100">
+                    Limited Time: Get 25% OFF on all Honey Products + FREE Shipping
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <Link
+                  href="/shop?category=1"
+                  className="bg-yellow-400 text-emerald-900 px-4 py-1 rounded-full font-semibold hover:bg-yellow-300 transition-colors text-sm"
                 >
-                  <User className="h-5 w-5" />
-                  <span className="hidden sm:block text-sm">Account</span>
+                  Shop Now
+                </Link>
+                <button
+                  onClick={dismissPremiumBanner}
+                  className="text-emerald-100 hover:text-white transition-colors p-1"
+                  aria-label="Dismiss banner"
+                >
+                  <X className="h-4 w-4" />
                 </button>
-
-                {isAccountMenuOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-50 border border-green-200">
-                    {user ? (
-                      <div className="space-y-1">
-                        <div className="px-4 py-2 border-b border-green-100">
-                          <p className="text-sm font-medium text-green-800">{user.first_name}</p>
-                        </div>
-                        <Link
-                          href="/profile"
-                          className="block px-4 py-2 text-sm text-green-800 hover:bg-green-50"
-                          onClick={() => setIsAccountMenuOpen(false)}
-                        >
-                          Profile
-                        </Link>
-                        <Link
-                          href="/orders"
-                          className="block px-4 py-2 text-sm text-green-800 hover:bg-green-50"
-                          onClick={() => setIsAccountMenuOpen(false)}
-                        >
-                          Orders
-                        </Link>
-                        <Link
-                          href="/addresses"
-                          className="block px-4 py-2 text-sm text-green-800 hover:bg-green-50"
-                          onClick={() => setIsAccountMenuOpen(false)}
-                        >
-                          Addresses
-                        </Link>
-                        <Link
-                          href="/wallet"
-                          className="block px-4 py-2 text-sm text-green-800 hover:bg-green-50"
-                          onClick={() => setIsAccountMenuOpen(false)}
-                        >
-                          Wallet
-                        </Link>
-                        <button
-                          onClick={handleLogout}
-                          className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-                        >
-                          Logout
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <Link
-                          href="/login"
-                          className="block px-4 py-2 text-sm text-green-800 hover:bg-green-50"
-                          onClick={() => setIsAccountMenuOpen(false)}
-                        >
-                          Login
-                        </Link>
-                        <Link
-                          href="/register"
-                          className="block px-4 py-2 text-sm text-green-800 hover:bg-green-50"
-                          onClick={() => setIsAccountMenuOpen(false)}
-                        >
-                          Sign Up
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
-
-              {/* Cart */}
-              <Link
-                href="/cart"
-                className="flex items-center space-x-1 text-green-800 hover:text-green-600 transition-colors"
-              >
-                <div className="relative">
-                  <ShoppingCart className="h-5 w-5" />
-                  {cartState.summary.total_items > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                      {cartState.summary.total_items}
-                    </span>
-                  )}
-                </div>
-                <span className="hidden sm:block text-sm">
-                  ₹{cartState.summary.subtotal?.toFixed(2) || "0.00"} ({cartState.summary.total_items || 0})
-                </span>
-              </Link>
-
-              {/* Mobile Menu */}
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="md:hidden text-green-800 hover:text-green-600"
-              >
-                {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-              </button>
             </div>
           </div>
-
-          {/* Mobile Menu */}
-          {isMenuOpen && (
-            <div className="md:hidden border-t border-green-200 bg-green-50/50">
-              <div className="px-4 py-4 space-y-3">
-                <Link
-                  href="/shop"
-                  className="block text-green-800 hover:text-green-600 font-medium"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Shop
-                </Link>
-                <Link
-                  href="/about"
-                  className="block text-green-800 hover:text-green-600 font-medium"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  About
-                </Link>
-                <Link
-                  href="/wishlist"
-                  className="block text-green-800 hover:text-green-600 font-medium"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  Wishlist ({wishlistItems.length})
-                </Link>
-                {user && (
-                  <div className="border-t border-green-200 pt-3 space-y-2">
-                    <Link
-                      href="/profile"
-                      className="block text-green-800 hover:text-green-600"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Profile
-                    </Link>
-                    <Link
-                      href="/orders"
-                      className="block text-green-800 hover:text-green-600"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Orders
-                    </Link>
-                    <Link
-                      href="/wallet"
-                      className="block text-green-800 hover:text-green-600"
-                      onClick={() => setIsMenuOpen(false)}
-                    >
-                      Wallet
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
+      )}
 
-        {/* Click outside to close */}
-        {isAccountMenuOpen && <div className="fixed inset-0 z-40" onClick={() => setIsAccountMenuOpen(false)}></div>}
-      </header>
-    </>
+      {/* Main Header */}
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-20">
+          {/* Logo */}
+          <Link href="/" className="flex items-center space-x-3">
+            <div className="relative w-12 h-12">
+              <Image src="/images/squirrel-logo.png" alt="Forest Store Logo" fill className="object-contain" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-bold text-2xl text-emerald-800 tracking-wide">Forest Store</span>
+              <span className="text-xs text-emerald-600 -mt-1">Natural & Pure</span>
+            </div>
+          </Link>
+
+          {/* Main Navigation */}
+          <nav className="hidden md:flex items-center space-x-8">
+            <Link href="/shop" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors">
+              Shop
+            </Link>
+            <Link href="/about" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors">
+              About
+            </Link>
+          </nav>
+
+          {/* Right Navigation */}
+          <div className="flex items-center space-x-4">
+            {/* Search Icon (Mobile) */}
+            <Button variant="ghost" size="sm" className="md:hidden p-2">
+              <Search className="h-5 w-5" />
+            </Button>
+
+            {/* Wishlist */}
+            <Link href="/wishlist">
+              <Button variant="ghost" size="sm" className="p-2 hover:text-emerald-600">
+                <Heart className="h-5 w-5" />
+              </Button>
+            </Link>
+
+            {/* Cart */}
+            <Link href="/cart" className="relative">
+              <Button variant="ghost" size="sm" className="p-2 hover:text-emerald-600">
+                <ShoppingCart className="h-5 w-5" />
+                {getTotalItems() > 0 && (
+                  <Badge className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs bg-emerald-600">
+                    {getTotalItems()}
+                  </Badge>
+                )}
+              </Button>
+            </Link>
+
+            {/* User Menu */}
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="p-2 hover:text-emerald-600">
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem asChild>
+                    <Link href="/profile">Profile</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/orders">Orders</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/wishlist">Wishlist</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/referrals">Referrals</Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={logout} className="text-red-600">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex space-x-2">
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/login">Login</Link>
+                </Button>
+                <Button asChild size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                  <Link href="/register">Register</Link>
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Search Bar - Full Width Below Header */}
+      <div className="border-t border-b border-gray-200 py-3 hidden md:block">
+        <div className="container mx-auto px-4">
+          <form onSubmit={handleSearch} className="max-w-md mx-auto">
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="Search natural products..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-10 focus:ring-emerald-500 focus:border-emerald-500"
+              />
+              <Button type="submit" size="sm" className="absolute right-1 top-1 h-8 w-8 p-0" variant="ghost">
+                <Search className="h-4 w-4" />
+              </Button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </header>
   )
 }

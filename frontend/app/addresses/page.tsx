@@ -9,17 +9,20 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/contexts/ToastContext"
 import Button from "@/shared/ui/button/Button"
 import Input from "@/shared/ui/input/Input"
+import axios from "axios"
 
 interface Address {
-  id: string
-  name: string
+  address_id: string
+  full_name: string
   phone: string
-  address: string
+  address_line1: string
+  address_line2?: string
   city: string
   state: string
-  pincode: string
-  type: "home" | "work" | "other"
-  isDefault: boolean
+  postal_code: string
+  landmark?: string
+  address_type: "home" | "work" | "other"
+  is_default: boolean
 }
 
 export default function AddressesPage() {
@@ -28,14 +31,16 @@ export default function AddressesPage() {
   const [editingAddress, setEditingAddress] = useState<Address | null>(null)
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
-    name: "",
+    full_name: "",
     phone: "",
-    address: "",
+    address_line1: "",
+    address_line2: "",
     city: "",
     state: "",
-    pincode: "",
-    type: "home" as "home" | "work" | "other",
-    isDefault: false,
+    postal_code: "",
+    landmark: "",
+    address_type: "home" as "home" | "work" | "other",
+    is_default: false,
   })
 
   const { user } = useAuth()
@@ -50,33 +55,13 @@ export default function AddressesPage() {
     loadAddresses()
   }, [user, router])
 
-  const loadAddresses = () => {
-    // Mock addresses - replace with actual API call
-    const mockAddresses: Address[] = [
-      {
-        id: "1",
-        name: "John Doe",
-        phone: "+91 98765 43210",
-        address: "123 Green Street, Apartment 4B",
-        city: "Mumbai",
-        state: "Maharashtra",
-        pincode: "400001",
-        type: "home",
-        isDefault: true,
-      },
-      {
-        id: "2",
-        name: "John Doe",
-        phone: "+91 98765 43210",
-        address: "456 Business Park, Floor 5",
-        city: "Mumbai",
-        state: "Maharashtra",
-        pincode: "400070",
-        type: "work",
-        isDefault: false,
-      },
-    ]
-    setAddresses(mockAddresses)
+  const loadAddresses = async () => {
+    try {
+      const response = await axios.get("/api/user/addresses")
+      setAddresses(response.data.addresses)
+    } catch (error) {
+      showToast("Failed to load addresses", "error")
+    }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -94,30 +79,29 @@ export default function AddressesPage() {
     try {
       if (editingAddress) {
         // Update existing address
-        setAddresses((prev) => prev.map((addr) => (addr.id === editingAddress.id ? { ...addr, ...formData } : addr)))
+        await axios.put(`/api/user/addresses/${editingAddress.address_id}`, formData)
         showToast("Address updated successfully", "success")
       } else {
         // Add new address
-        const newAddress: Address = {
-          id: Date.now().toString(),
-          ...formData,
-        }
-        setAddresses((prev) => [...prev, newAddress])
+        await axios.post("/api/user/addresses", formData)
         showToast("Address added successfully", "success")
       }
 
       setShowForm(false)
       setEditingAddress(null)
       setFormData({
-        name: "",
+        full_name: "",
         phone: "",
-        address: "",
+        address_line1: "",
+        address_line2: "",
         city: "",
         state: "",
-        pincode: "",
-        type: "home",
-        isDefault: false,
+        postal_code: "",
+        landmark: "",
+        address_type: "home",
+        is_default: false,
       })
+      loadAddresses() // Reload addresses after adding/updating
     } catch (error) {
       showToast("Failed to save address", "error")
     } finally {
@@ -128,33 +112,40 @@ export default function AddressesPage() {
   const handleEdit = (address: Address) => {
     setEditingAddress(address)
     setFormData({
-      name: address.name,
+      full_name: address.full_name,
       phone: address.phone,
-      address: address.address,
+      address_line1: address.address_line1,
+      address_line2: address.address_line2 || "",
       city: address.city,
       state: address.state,
-      pincode: address.pincode,
-      type: address.type,
-      isDefault: address.isDefault,
+      postal_code: address.postal_code,
+      landmark: address.landmark || "",
+      address_type: address.address_type,
+      is_default: address.is_default,
     })
     setShowForm(true)
   }
 
-  const handleDelete = (addressId: string) => {
+  const handleDelete = async (addressId: string) => {
     if (confirm("Are you sure you want to delete this address?")) {
-      setAddresses((prev) => prev.filter((addr) => addr.id !== addressId))
-      showToast("Address deleted successfully", "success")
+      try {
+        await axios.delete(`/api/user/addresses/${addressId}`)
+        showToast("Address deleted successfully", "success")
+        loadAddresses() // Reload addresses after deleting
+      } catch (error) {
+        showToast("Failed to delete address", "error")
+      }
     }
   }
 
-  const handleSetDefault = (addressId: string) => {
-    setAddresses((prev) =>
-      prev.map((addr) => ({
-        ...addr,
-        isDefault: addr.id === addressId,
-      })),
-    )
-    showToast("Default address updated", "success")
+  const handleSetDefault = async (addressId: string) => {
+    try {
+      await axios.put(`/api/user/addresses/${addressId}`, { is_default: true })
+      showToast("Default address updated", "success")
+      loadAddresses() // Reload addresses after updating default
+    } catch (error) {
+      showToast("Failed to update default address", "error")
+    }
   }
 
   const INDIAN_STATES = [
@@ -214,11 +205,12 @@ export default function AddressesPage() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Full Name" name="name" value={formData.name} onChange={handleInputChange} required />
+              <Input label="Full Name" name="full_name" value={formData.full_name} onChange={handleInputChange} required />
               <Input label="Phone Number" name="phone" value={formData.phone} onChange={handleInputChange} required />
             </div>
 
-            <Input label="Address" name="address" value={formData.address} onChange={handleInputChange} required />
+            <Input label="Address Line 1" name="address_line1" value={formData.address_line1} onChange={handleInputChange} required />
+            <Input label="Address Line 2 (Optional)" name="address_line2" value={formData.address_line2} onChange={handleInputChange} />
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Input label="City" name="city" value={formData.city} onChange={handleInputChange} required />
@@ -241,15 +233,17 @@ export default function AddressesPage() {
                 </select>
               </div>
 
-              <Input label="PIN Code" name="pincode" value={formData.pincode} onChange={handleInputChange} required />
+              <Input label="PIN Code" name="postal_code" value={formData.postal_code} onChange={handleInputChange} required />
             </div>
+
+            <Input label="Landmark (Optional)" name="landmark" value={formData.landmark} onChange={handleInputChange} />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address Type</label>
                 <select
-                  name="type"
-                  value={formData.type}
+                  name="address_type"
+                  value={formData.address_type}
                   onChange={handleInputChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
@@ -262,20 +256,20 @@ export default function AddressesPage() {
               <div className="flex items-center pt-6">
                 <input
                   type="checkbox"
-                  id="isDefault"
-                  name="isDefault"
-                  checked={formData.isDefault}
+                  id="is_default"
+                  name="is_default"
+                  checked={formData.is_default}
                   onChange={handleInputChange}
                   className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
                 />
-                <label htmlFor="isDefault" className="ml-2 block text-sm text-gray-700">
+                <label htmlFor="is_default" className="ml-2 block text-sm text-gray-700">
                   Set as default address
                 </label>
               </div>
             </div>
 
             <div className="flex gap-4">
-              <Button type="submit" loading={loading}>
+              <Button type="submit" disabled={loading}>
                 {editingAddress ? "Update Address" : "Add Address"}
               </Button>
               <Button
@@ -285,14 +279,16 @@ export default function AddressesPage() {
                   setShowForm(false)
                   setEditingAddress(null)
                   setFormData({
-                    name: "",
+                    full_name: "",
                     phone: "",
-                    address: "",
+                    address_line1: "",
+                    address_line2: "",
                     city: "",
                     state: "",
-                    pincode: "",
-                    type: "home",
-                    isDefault: false,
+                    postal_code: "",
+                    landmark: "",
+                    address_type: "home",
+                    is_default: false,
                   })
                 }}
               >
@@ -305,12 +301,12 @@ export default function AddressesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {addresses.map((address) => (
-          <div key={address.id} className="bg-white rounded-lg shadow-sm border border-green-100 p-6">
+          <div key={address.address_id} className="bg-white rounded-lg shadow-sm border border-green-100 p-6">
             <div className="flex justify-between items-start mb-4">
               <div className="flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-green-600" />
-                <span className="font-medium text-green-800 capitalize">{address.type}</span>
-                {address.isDefault && (
+                <span className="font-medium text-green-800 capitalize">{address.address_type}</span>
+                {address.is_default && (
                   <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-medium">Default</span>
                 )}
               </div>
@@ -318,24 +314,26 @@ export default function AddressesPage() {
                 <button onClick={() => handleEdit(address)} className="p-1 text-green-600 hover:text-green-800">
                   <Edit2 className="h-4 w-4" />
                 </button>
-                <button onClick={() => handleDelete(address.id)} className="p-1 text-red-600 hover:text-red-800">
+                <button onClick={() => handleDelete(address.address_id)} className="p-1 text-red-600 hover:text-red-800">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
             <div className="space-y-1 text-green-700">
-              <p className="font-medium">{address.name}</p>
+              <p className="font-medium">{address.full_name}</p>
               <p>{address.phone}</p>
-              <p>{address.address}</p>
+              <p>{address.address_line1}</p>
+              {address.address_line2 && <p>{address.address_line2}</p>}
               <p>
-                {address.city}, {address.state} {address.pincode}
+                {address.city}, {address.state} {address.postal_code}
               </p>
+              {address.landmark && <p>Landmark: {address.landmark}</p>}
             </div>
 
-            {!address.isDefault && (
+            {!address.is_default && (
               <button
-                onClick={() => handleSetDefault(address.id)}
+                onClick={() => handleSetDefault(address.address_id)}
                 className="mt-4 text-sm text-green-600 hover:text-green-800 font-medium"
               >
                 Set as Default
@@ -345,7 +343,7 @@ export default function AddressesPage() {
         ))}
       </div>
 
-      {addresses.length === 0 && (
+      {addresses.length === 0 && !showForm && (
         <div className="text-center py-12">
           <MapPin className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h2 className="text-xl font-heading font-bold text-green-800 mb-2">No addresses yet</h2>

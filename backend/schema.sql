@@ -1,8 +1,6 @@
+CREATE DATABASE ecommerce CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE ecommerce;
 
-CREATE DATABASE ecommerce_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE ecommerce_db;
-
--- Categories table
 CREATE TABLE categories (
     category_id INT PRIMARY KEY AUTO_INCREMENT,
     category_name VARCHAR(100) NOT NULL,
@@ -18,7 +16,6 @@ CREATE TABLE categories (
     INDEX idx_status (status)
 );
 
--- Users table
 CREATE TABLE users (
     user_id VARCHAR(36) PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -39,7 +36,32 @@ CREATE TABLE users (
     INDEX idx_status (status)
 );
 
--- Addresses table
+CREATE TABLE referral_codes (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id VARCHAR(36) NOT NULL,
+    code VARCHAR(20) UNIQUE NOT NULL,
+    status ENUM('active', 'inactive') DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_code (code),
+    INDEX idx_status (status)
+);
+
+CREATE TABLE referral_uses (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    referral_code_id INT NOT NULL,
+    referred_user_id VARCHAR(36) NOT NULL,
+    reward_given BOOLEAN DEFAULT FALSE,
+    first_purchase_date TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (referral_code_id) REFERENCES referral_codes(id) ON DELETE CASCADE,
+    FOREIGN KEY (referred_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    INDEX idx_referral_code_id (referral_code_id),
+    INDEX idx_referred_user_id (referred_user_id),
+    INDEX idx_reward_given (reward_given)
+);
+
 CREATE TABLE addresses (
     address_id INT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(36) NOT NULL,
@@ -61,7 +83,6 @@ CREATE TABLE addresses (
     INDEX idx_is_default (is_default)
 );
 
--- Products table
 CREATE TABLE products (
     product_id INT PRIMARY KEY AUTO_INCREMENT,
     product_name VARCHAR(255) NOT NULL,
@@ -91,7 +112,6 @@ CREATE TABLE products (
     FULLTEXT idx_search (product_name, description)
 );
 
--- Product images table
 CREATE TABLE product_images (
     image_id INT PRIMARY KEY AUTO_INCREMENT,
     product_id INT NOT NULL,
@@ -105,23 +125,6 @@ CREATE TABLE product_images (
     INDEX idx_is_primary (is_primary)
 );
 
--- Product variants table
-CREATE TABLE product_variants (
-    variant_id INT PRIMARY KEY AUTO_INCREMENT,
-    product_id INT NOT NULL,
-    variant_name VARCHAR(100) NOT NULL,
-    variant_value VARCHAR(100) NOT NULL,
-    price_adjustment DECIMAL(10, 2) DEFAULT 0,
-    weight_adjustment DECIMAL(8, 3) DEFAULT 0,
-    sku VARCHAR(100),
-    status ENUM('active', 'inactive') DEFAULT 'active',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
-    INDEX idx_product_id (product_id),
-    INDEX idx_status (status)
-);
-
--- Inventory table
 CREATE TABLE inventory (
     inventory_id INT PRIMARY KEY AUTO_INCREMENT,
     product_id INT NOT NULL,
@@ -133,13 +136,11 @@ CREATE TABLE inventory (
     location VARCHAR(100) DEFAULT 'main_warehouse',
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
-    FOREIGN KEY (variant_id) REFERENCES product_variants(variant_id) ON DELETE SET NULL,
     UNIQUE KEY unique_inventory (product_id, variant_id, location),
     INDEX idx_product_id (product_id),
     INDEX idx_quantity (quantity)
 );
 
--- Shopping cart table
 CREATE TABLE cart (
     cart_id INT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(36) NOT NULL,
@@ -150,12 +151,10 @@ CREATE TABLE cart (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
-    FOREIGN KEY (variant_id) REFERENCES product_variants(variant_id) ON DELETE SET NULL,
     UNIQUE KEY unique_cart_item (user_id, product_id, variant_id),
     INDEX idx_user_id (user_id)
 );
 
--- Wallet table
 CREATE TABLE wallet (
     wallet_id INT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(36) UNIQUE NOT NULL,
@@ -165,7 +164,6 @@ CREATE TABLE wallet (
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
 
--- Wallet transactions table
 CREATE TABLE wallet_transactions (
     transaction_id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
@@ -183,7 +181,6 @@ CREATE TABLE wallet_transactions (
     INDEX idx_created_at (created_at)
 );
 
--- Orders table
 CREATE TABLE orders (
     order_id VARCHAR(36) PRIMARY KEY,
     user_id VARCHAR(36) NOT NULL,
@@ -212,7 +209,6 @@ CREATE TABLE orders (
     INDEX idx_created_at (created_at)
 );
 
--- Order items table
 CREATE TABLE order_items (
     item_id INT PRIMARY KEY AUTO_INCREMENT,
     order_id VARCHAR(36) NOT NULL,
@@ -226,25 +222,10 @@ CREATE TABLE order_items (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
     FOREIGN KEY (product_id) REFERENCES products(product_id),
-    FOREIGN KEY (variant_id) REFERENCES product_variants(variant_id) ON DELETE SET NULL,
     INDEX idx_order_id (order_id),
     INDEX idx_product_id (product_id)
 );
 
--- Order tracking table
-CREATE TABLE order_tracking (
-    tracking_id INT PRIMARY KEY AUTO_INCREMENT,
-    order_id VARCHAR(36) NOT NULL,
-    status ENUM('order_placed', 'confirmed', 'processing', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled') NOT NULL,
-    message TEXT,
-    location VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
-    INDEX idx_order_id (order_id),
-    INDEX idx_status (status)
-);
-
--- Reviews table
 CREATE TABLE reviews (
     review_id INT PRIMARY KEY AUTO_INCREMENT,
     product_id INT NOT NULL,
@@ -266,7 +247,6 @@ CREATE TABLE reviews (
     INDEX idx_rating (rating)
 );
 
--- Wishlist table
 CREATE TABLE wishlist (
     wishlist_id INT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(36) NOT NULL,
@@ -278,7 +258,6 @@ CREATE TABLE wishlist (
     INDEX idx_user_id (user_id)
 );
 
--- Promo codes table
 CREATE TABLE promocodes (
     code_id INT PRIMARY KEY AUTO_INCREMENT,
     code VARCHAR(50) UNIQUE NOT NULL,
@@ -299,7 +278,6 @@ CREATE TABLE promocodes (
     INDEX idx_valid_dates (valid_from, valid_until)
 );
 
--- Admin users table
 CREATE TABLE admin_users (
     admin_id VARCHAR(36) PRIMARY KEY,
     username VARCHAR(100) UNIQUE NOT NULL,
@@ -330,78 +308,6 @@ CREATE TABLE email_verifications (
     INDEX idx_expires_at (expires_at)
 );
 
--- Add email verification status to existing users (if not already exists)
-ALTER TABLE users 
-ADD COLUMN verification_sent_at TIMESTAMP NULL;
-
--- Update existing users to be verified (for testing)
-UPDATE users SET email_verified = TRUE WHERE email_verified IS NULL;
--- Insert default categories
-INSERT INTO categories (category_name, description, status) VALUES
-('Nuts & Dry Fruits', 'Premium quality nuts and dry fruits', 'active'),
-('Seeds', 'Nutritious seeds for healthy lifestyle', 'active'),
-('Coffee & Tea', 'Premium coffee beans and tea varieties', 'active'),
-('Honey & Natural Sweeteners', 'Pure honey and natural sweeteners', 'active'),
-('Spices & Herbs', 'Fresh spices and aromatic herbs', 'active');
-
--- Insert sample products with proper GST rates
-INSERT INTO products (product_name, description, category_id, price, discount_price, sku, hsn_code, gst_rate, is_featured, brand, status) VALUES
-('Premium Almonds', ' premium almonds, rich in protein and healthy fats. ', 1, 899.00, 799.00, 'ALM001', '0801', 5.00, TRUE, 'NutriPro', 'active'),
-('Roasted Cashews', 'Premium roasted cashews .', 1, 1299.00, 1199.00, 'CSH001', '0801', 5.00, TRUE, 'NutriPro', 'active'),
-('Organic Walnuts', 'Fresh organic walnuts ', 1, 1599.00, 1399.00, 'WAL001', '0801', 5.00, FALSE, 'OrganicHarvest', 'active'),
-('Chia Seeds', 'Superfood chia seeds .', 2, 299.00, 249.00, 'CHI001', '1207', 5.00, TRUE, 'HealthySeeds', 'active'),
-('Flax Seeds', 'Organic flax seeds rich.', 2, 199.00, 179.00, 'FLX001', '1207', 5.00, FALSE, 'HealthySeeds', 'active'),
-('Arabica Coffee Beans', 'Premium Arabica coffee .', 3, 599.00, 549.00, 'COF001', '0901', 5.00, TRUE, 'CoffeeMaster', 'active'),
-('Green Tea', 'Premium green tea leaves with ', 3, 399.00, 349.00, 'TEA001', '0902', 5.00, FALSE, 'TeaGarden', 'active'),
-('Manuka Honey', 'Pure Manuka honey with.', 4, 1299.00, 1199.00, 'HON001', '0409', 0.00, TRUE, 'PureHoney', 'active'),
-('Organic Jaggery', 'Organic jaggery .', 4, 199.00, 179.00, 'JAG001', '1701', 5.00, FALSE, 'OrganicSweet', 'active'),
-('Turmeric Powder', 'Pure turmeric powder with high.', 5, 149.00, 129.00, 'TUR001', '0910', 5.00, TRUE, 'SpiceMaster', 'active');
-
--- Insert product images
-INSERT INTO product_images (product_id, image_url, alt_text, is_primary) VALUES
-(1, '/static/uploads/products/almonds1.jpg', 'Premium Almonds', TRUE),
-(2, '/static/uploads/products/cashews1.jpg', 'Roasted Cashews', TRUE),
-(3, '/static/uploads/products/walnuts1.jpg', 'Organic Walnuts', TRUE),
-(4, '/static/uploads/products/chia1.jpg', 'Chia Seeds', TRUE),
-(5, '/static/uploads/products/flax1.jpg', 'Flax Seeds', TRUE),
-(6, '/static/uploads/products/coffee1.jpg', 'Arabica Coffee Beans', TRUE),
-(7, '/static/uploads/products/tea1.jpg', 'Green Tea', TRUE),
-(8, '/static/uploads/products/honey1.jpg', 'Manuka Honey', TRUE),
-(9, '/static/uploads/products/jaggery1.jpg', 'Organic Jaggery', TRUE),
-(10, '/static/uploads/products/turmeric1.jpg', 'Turmeric Powder', TRUE);
-
--- Insert inventory for all products
-INSERT INTO inventory (product_id, quantity, min_stock_level) VALUES
-(1, 100, 20),
-(2, 75, 15),
-(3, 50, 10),
-(4, 200, 30),
-(5, 150, 25),
-(6, 80, 15),
-(7, 120, 20),
-(8, 60, 10),
-(9, 180, 35),
-(10, 220, 40);
-
--- Insert default admin user (username: admin, password: admin123)
-INSERT INTO admin_users (admin_id, username, email, password_hash, full_name, role, status) VALUES
-('admin-001', 'admin', 'admin@yourstore.com', '32768:8:1$ccz4yn7Em7OgVl78$00a5006966d4b4fb7fb7bb44e16738d9f4303236e6c6da1b4795647db2df96676d92f112f4c184402413814d7d1539af16ce329d0814e9b6d4b70acc52417978', 'System Administrator', 'super_admin', 'active');
-
--- Insert sample promocodes
-INSERT INTO promocodes (code, description, discount_type, discount_value, min_order_amount, max_discount_amount, usage_limit, valid_from, valid_until, status) VALUES
-('WELCOME10', 'Welcome discount - 10% off on first order', 'percentage', 10.00, 500.00, 200.00, 1000, NOW(), DATE_ADD(NOW(), INTERVAL 6 MONTH), 'active'),
-('SAVE50', 'Flat ₹50 off on orders above ₹300', 'fixed', 50.00, 300.00, 50.00, 500, NOW(), DATE_ADD(NOW(), INTERVAL 3 MONTH), 'active'),
-('NUTS20', '20% off on all nuts products', 'percentage', 20.00, 200.00, 500.00, 200, NOW(), DATE_ADD(NOW(), INTERVAL 1 MONTH), 'active'),
-('FREESHIP', 'Free shipping on all orders', 'fixed', 50.00, 0.00, 50.00, NULL, NOW(), DATE_ADD(NOW(), INTERVAL 12 MONTH), 'active'),
-('BULK15', '15% off on orders above ₹1000', 'percentage', 15.00, 1000.00, 1000.00, 100, NOW(), DATE_ADD(NOW(), INTERVAL 2 MONTH), 'active');
-
--- Create indexes for better performance
-CREATE INDEX idx_products_price ON products(price);
-CREATE INDEX idx_products_discount_price ON products(discount_price);
-CREATE INDEX idx_orders_total_amount ON orders(total_amount);
-CREATE INDEX idx_reviews_created_at ON reviews(created_at);
-CREATE INDEX idx_wallet_transactions_created_at ON wallet_transactions(created_at);
-
 CREATE TABLE password_reset_tokens (
     reset_id INT PRIMARY KEY AUTO_INCREMENT,
     user_id VARCHAR(36) NOT NULL,
@@ -415,7 +321,149 @@ CREATE TABLE password_reset_tokens (
     INDEX idx_expires_at (expires_at)
 );
 
--- Optional: Add password reset fields to users table for tracking
-ALTER TABLE users 
-ADD COLUMN password_reset_requested_at TIMESTAMP NULL,
-ADD COLUMN password_reset_count INT DEFAULT 0;
+
+INSERT INTO categories (category_name, description, image_url, sort_order, status) VALUES
+('Honey & Natural Sweeteners', 'Pure honey and natural sweeteners for healthy living', '/static/uploads/categories/honey.jpg', 1, 'active'),
+('Premium Coffee', 'High-quality coffee beans and blends from around the world', '/static/uploads/categories/coffee.jpg', 2, 'active'),
+('Nuts & Dry Fruits', 'Premium quality nuts and dry fruits rich in nutrients', '/static/uploads/categories/nuts.jpg', 3, 'active'),
+('Super Seeds', 'Nutritious seeds packed with vitamins and minerals', '/static/uploads/categories/seeds.jpg', 4, 'active');
+
+INSERT INTO products (product_name, description, category_id, price, discount_price, sku, hsn_code, gst_rate, is_featured, brand, status, weight, meta_title, meta_description) VALUES
+
+('Raw Forest Honey', 'Pure unprocessed honey directly sourced from forest beekeepers. Rich in antioxidants and natural enzymes. Perfect for daily consumption and medicinal uses.', 1, 599.00, 549.00, 'HON001', '0409', 0.00, TRUE, 'PureHive', 'active', 0.500, 'Buy Raw Forest Honey Online - Pure & Natural', 'Premium raw forest honey with natural enzymes and antioxidants. Free delivery on orders above ₹500.'),
+
+('Manuka Honey Premium', 'Imported premium Manuka honey with high antibacterial properties. Perfect for boosting immunity and wound healing. MGO 400+ certified.', 1, 2999.00, 2699.00, 'HON002', '0409', 0.00, TRUE, 'ManukaGold', 'active', 0.250, 'Premium Manuka Honey MGO 400+ Online India', 'Authentic Manuka honey with powerful antibacterial properties. Imported from New Zealand.'),
+
+('Organic Wildflower Honey', 'Multi-floral honey collected from organic wildflower fields. Unfiltered and unpasteurized to retain all natural goodness. Light amber color with delicate taste.', 1, 449.00, 399.00, 'HON003', '0409', 0.00, FALSE, 'WildBloom', 'active', 0.500, 'Organic Wildflower Honey - Unfiltered & Pure', 'Multi-floral wildflower honey with delicate taste and natural sweetness.'),
+
+('Eucalyptus Honey', 'Single-origin eucalyptus honey with distinctive mentholated flavor. Excellent for respiratory health and sore throat relief. Dark amber colored.', 1, 699.00, 649.00, 'HON004', '0409', 0.00, FALSE, 'EucaHive', 'active', 0.500, 'Eucalyptus Honey for Respiratory Health', 'Pure eucalyptus honey with mentholated flavor, perfect for cold and cough relief.'),
+
+('Himalayan Rock Honey', 'Rare cliff honey harvested from Himalayan rock bees. Collected at high altitude with unique mineral content. Limited edition artisanal honey.', 1, 1299.00, 1199.00, 'HON005', '0409', 0.00, TRUE, 'HimalayaGold', 'active', 0.350, 'Rare Himalayan Rock Honey - Limited Edition', 'Exclusive cliff honey from Himalayan rock bees with unique mineral profile.'),
+
+('Arabica Coffee Beans Premium', 'Single-origin Arabica coffee beans from Coorg plantations. Medium roast with chocolatey notes and low acidity. Perfect for espresso and filter coffee.', 2, 899.00, 799.00, 'COF001', '0901', 5.00, TRUE, 'CoorgCoffee', 'active', 1.000, 'Premium Arabica Coffee Beans from Coorg', 'Single-origin Arabica coffee with rich chocolate notes. Fresh roasted to order.'),
+
+('Blue Mountain Coffee', 'Rare Jamaican Blue Mountain coffee beans. Smooth, mild flavor with no bitterness. One of the world\'s most expensive and sought-after coffees.', 2, 3999.00, 3599.00, 'COF002', '0901', 5.00, TRUE, 'BluePeak', 'active', 0.500, 'Jamaican Blue Mountain Coffee - Premium Grade', 'Authentic Blue Mountain coffee with smooth, mild flavor and zero bitterness.'),
+
+('South Indian Filter Coffee', 'Traditional blend of Arabica and Robusta beans perfect for South Indian filter coffee. Dark roast with strong aroma and rich taste.', 2, 549.00, 499.00, 'COF003', '0901', 5.00, FALSE, 'FilterMaster', 'active', 1.000, 'Authentic South Indian Filter Coffee Blend', 'Traditional coffee blend for perfect filter coffee with strong aroma.'),
+
+('Ethiopian Single Origin', 'Premium Ethiopian coffee beans with fruity and wine-like characteristics. Light to medium roast highlighting the natural flavors of the region.', 2, 1199.00, 1099.00, 'COF004', '0901', 5.00, FALSE, 'EthiopianGold', 'active', 0.500, 'Ethiopian Single Origin Coffee - Fruity Notes', 'Premium Ethiopian coffee with natural fruity and wine-like characteristics.'),
+
+('Espresso Blend Supreme', 'Perfect espresso blend combining Brazilian, Colombian and Italian roasting techniques. Dark roast with crema formation and balanced acidity.', 2, 799.00, 729.00, 'COF005', '0901', 5.00, TRUE, 'EspressoMaster', 'active', 1.000, 'Supreme Espresso Coffee Blend - Perfect Crema', 'Professional espresso blend with perfect crema and balanced acidity.'),
+
+('Premium California Almonds', 'Grade A California almonds. Rich in protein, healthy fats, and vitamin E. Perfect for snacking, baking, and making almond milk. Naturally sweet and crunchy.', 3, 899.00, 799.00, 'NUT001', '0801', 5.00, TRUE, 'NutriChoice', 'active', 1.000, 'Premium California Almonds - Grade A Quality', 'Fresh California almonds rich in protein and vitamin E. Perfect for healthy snacking.'),
+
+('Kashmiri Walnuts', 'Premium Kashmiri walnuts with brain-shaped kernels. Rich in omega-3 fatty acids and antioxidants. Light colored with mild, sweet taste.', 3, 1599.00, 1399.00, 'NUT002', '0801', 5.00, TRUE, 'KashmirNuts', 'active', 1.000, 'Kashmiri Walnuts - Premium Quality Brain Food', 'Fresh Kashmiri walnuts rich in omega-3 fatty acids. Perfect brain food.'),
+
+('Roasted Cashews', 'Premium cashews roasted to perfection with light salt. Creamy texture and rich flavor. Great for snacking and cooking. Grade W320 cashews.', 3, 1299.00, 1199.00, 'NUT003', '0801', 5.00, FALSE, 'CashewKing', 'active', 1.000, 'Roasted Cashews W320 Grade - Premium Quality', 'Perfectly roasted cashews with creamy texture and rich flavor.'),
+
+('Afghani Dried Figs', 'Premium Afghani anjeer (dried figs) naturally sun-dried. Rich in fiber, potassium, and antioxidants. Soft texture with natural sweetness.', 3, 649.00, 599.00, 'NUT004', '0804', 5.00, FALSE, 'FigDelight', 'active', 0.500, 'Afghani Dried Figs - Natural & Soft', 'Premium quality Afghani figs naturally sun-dried with rich flavor.'),
+
+('Mixed Dry Fruits Premium', 'Carefully selected mix of almonds, cashews, raisins, and dates. Perfect for gifting and daily consumption. Maintains individual taste of each dry fruit.', 3, 1199.00, 1099.00, 'NUT005', '0801', 5.00, TRUE, 'MixMaster', 'active', 1.000, 'Premium Mixed Dry Fruits - Gift Pack', 'Premium assortment of almonds, cashews, raisins and dates in gift packaging.'),
+
+('Organic Chia Seeds', 'Superfood chia seeds rich in omega-3, fiber, and protein. Perfect for smoothies, puddings, and healthy recipes. Sourced from organic farms.', 4, 399.00, 349.00, 'SED001', '1207', 5.00, TRUE, 'SuperSeed', 'active', 0.500, 'Organic Chia Seeds - Superfood for Health', 'Premium chia seeds rich in omega-3 and fiber. Perfect for healthy recipes.'),
+
+('Premium Flax Seeds', 'Golden flax seeds rich in lignans and alpha-linolenic acid. Supports heart health and digestion. Can be consumed whole or ground.', 4, 299.00, 269.00, 'SED002', '1207', 5.00, FALSE, 'FlaxGold', 'active', 1.000, 'Premium Golden Flax Seeds - Heart Healthy', 'Golden flax seeds rich in lignans supporting heart health and digestion.'),
+
+('Pumpkin Seeds Roasted', 'Roasted pumpkin seeds (pepitas) with light salt. Rich in zinc, magnesium, and healthy fats. Crunchy texture perfect for snacking.', 4, 549.00, 499.00, 'SED003', '1207', 5.00, TRUE, 'PumpkinPower', 'active', 0.500, 'Roasted Pumpkin Seeds - Rich in Zinc', 'Perfectly roasted pumpkin seeds rich in zinc and magnesium. Healthy snacking.'),
+
+('Sunflower Seeds', 'Raw sunflower seeds rich in vitamin E and selenium. Perfect for snacking, salads, and baking. Mild nutty flavor with crunchy texture.', 4, 199.00, 179.00, 'SED004', '1207', 5.00, FALSE, 'SunnySeeds', 'active', 1.000, 'Raw Sunflower Seeds - Vitamin E Rich', 'Fresh sunflower seeds rich in vitamin E and selenium. Perfect for healthy snacking.'),
+
+('Hemp Hearts (Hemp Seeds)', 'Hulled hemp seeds with complete protein profile. Rich in omega fatty acids and minerals. Nutty flavor perfect for smoothies and salads.', 4, 799.00, 749.00, 'SED005', '1207', 5.00, TRUE, 'HempNature', 'active', 0.500, 'Hemp Hearts - Complete Protein Seeds', 'Hulled hemp seeds with complete protein and omega fatty acids. Superfood nutrition.');
+
+INSERT INTO product_images (product_id, image_url, alt_text, sort_order, is_primary) VALUES
+(1, '/static/uploads/products/honey/raw-forest-honey-1.jpg', 'Raw Forest Honey Jar', 0, TRUE),
+(1, '/static/uploads/products/honey/raw-forest-honey-2.jpg', 'Raw Forest Honey Texture', 1, FALSE),
+(1, '/static/uploads/products/honey/raw-forest-honey-3.jpg', 'Raw Forest Honey Pour', 2, FALSE),
+
+(2, '/static/uploads/products/honey/manuka-honey-1.jpg', 'Manuka Honey Premium Jar', 0, TRUE),
+(2, '/static/uploads/products/honey/manuka-honey-2.jpg', 'Manuka Honey Certificate', 1, FALSE),
+(2, '/static/uploads/products/honey/manuka-honey-3.jpg', 'Manuka Honey Spoon', 2, FALSE),
+
+(3, '/static/uploads/products/honey/wildflower-honey-1.jpg', 'Organic Wildflower Honey', 0, TRUE),
+(3, '/static/uploads/products/honey/wildflower-honey-2.jpg', 'Wildflower Honey Color', 1, FALSE),
+
+(4, '/static/uploads/products/honey/eucalyptus-honey-1.jpg', 'Eucalyptus Honey Dark', 0, TRUE),
+(4, '/static/uploads/products/honey/eucalyptus-honey-2.jpg', 'Eucalyptus Honey Packaging', 1, FALSE),
+
+(5, '/static/uploads/products/honey/himalayan-honey-1.jpg', 'Himalayan Rock Honey', 0, TRUE),
+(5, '/static/uploads/products/honey/himalayan-honey-2.jpg', 'Himalayan Honey Cliff', 1, FALSE),
+(5, '/static/uploads/products/honey/himalayan-honey-3.jpg', 'Himalayan Honey Crystal', 2, FALSE),
+
+(6, '/static/uploads/products/coffee/arabica-beans-1.jpg', 'Arabica Coffee Beans', 0, TRUE),
+(6, '/static/uploads/products/coffee/arabica-beans-2.jpg', 'Arabica Beans Close-up', 1, FALSE),
+(6, '/static/uploads/products/coffee/arabica-beans-3.jpg', 'Arabica Coffee Cup', 2, FALSE),
+
+(7, '/static/uploads/products/coffee/blue-mountain-1.jpg', 'Blue Mountain Coffee Beans', 0, TRUE),
+(7, '/static/uploads/products/coffee/blue-mountain-2.jpg', 'Blue Mountain Package', 1, FALSE),
+
+(8, '/static/uploads/products/coffee/filter-coffee-1.jpg', 'South Indian Filter Coffee', 0, TRUE),
+(8, '/static/uploads/products/coffee/filter-coffee-2.jpg', 'Filter Coffee Brewing', 1, FALSE),
+
+(9, '/static/uploads/products/coffee/ethiopian-coffee-1.jpg', 'Ethiopian Coffee Beans', 0, TRUE),
+(9, '/static/uploads/products/coffee/ethiopian-coffee-2.jpg', 'Ethiopian Coffee Origin', 1, FALSE),
+
+(10, '/static/uploads/products/coffee/espresso-blend-1.jpg', 'Espresso Blend Beans', 0, TRUE),
+(10, '/static/uploads/products/coffee/espresso-blend-2.jpg', 'Espresso Crema', 1, FALSE),
+
+(11, '/static/uploads/products/nuts/california-almonds-1.jpg', 'California Almonds Premium', 0, TRUE),
+(11, '/static/uploads/products/nuts/california-almonds-2.jpg', 'Almonds Close-up', 1, FALSE),
+(11, '/static/uploads/products/nuts/california-almonds-3.jpg', 'Almonds Nutrition', 2, FALSE),
+
+(12, '/static/uploads/products/nuts/kashmiri-walnuts-1.jpg', 'Kashmiri Walnuts', 0, TRUE),
+(12, '/static/uploads/products/nuts/kashmiri-walnuts-2.jpg', 'Walnuts Brain Shape', 1, FALSE),
+
+(13, '/static/uploads/products/nuts/roasted-cashews-1.jpg', 'Roasted Cashews Premium', 0, TRUE),
+(13, '/static/uploads/products/nuts/roasted-cashews-2.jpg', 'Cashews W320 Grade', 1, FALSE),
+
+(14, '/static/uploads/products/nuts/afghani-figs-1.jpg', 'Afghani Dried Figs', 0, TRUE),
+(14, '/static/uploads/products/nuts/afghani-figs-2.jpg', 'Figs Soft Texture', 1, FALSE),
+
+(15, '/static/uploads/products/nuts/mixed-dry-fruits-1.jpg', 'Mixed Dry Fruits Premium', 0, TRUE),
+(15, '/static/uploads/products/nuts/mixed-dry-fruits-2.jpg', 'Mixed Nuts Variety', 1, FALSE),
+(15, '/static/uploads/products/nuts/mixed-dry-fruits-3.jpg', 'Gift Pack Presentation', 2, FALSE),
+
+(16, '/static/uploads/products/seeds/chia-seeds-1.jpg', 'Organic Chia Seeds', 0, TRUE),
+(16, '/static/uploads/products/seeds/chia-seeds-2.jpg', 'Chia Seeds Texture', 1, FALSE),
+(16, '/static/uploads/products/seeds/chia-seeds-3.jpg', 'Chia Pudding Recipe', 2, FALSE),
+
+(17, '/static/uploads/products/seeds/flax-seeds-1.jpg', 'Golden Flax Seeds', 0, TRUE),
+(17, '/static/uploads/products/seeds/flax-seeds-2.jpg', 'Flax Seeds Benefits', 1, FALSE),
+
+(18, '/static/uploads/products/seeds/pumpkin-seeds-1.jpg', 'Roasted Pumpkin Seeds', 0, TRUE),
+(18, '/static/uploads/products/seeds/pumpkin-seeds-2.jpg', 'Pumpkin Seeds Snack', 1, FALSE),
+
+(19, '/static/uploads/products/seeds/sunflower-seeds-1.jpg', 'Raw Sunflower Seeds', 0, TRUE),
+(19, '/static/uploads/products/seeds/sunflower-seeds-2.jpg', 'Sunflower Seeds Bowl', 1, FALSE),
+
+(20, '/static/uploads/products/seeds/hemp-hearts-1.jpg', 'Hemp Hearts Seeds', 0, TRUE),
+(20, '/static/uploads/products/seeds/hemp-hearts-2.jpg', 'Hemp Seeds Protein', 1, FALSE);
+
+INSERT INTO inventory (product_id, quantity, min_stock_level, max_stock_level) VALUES
+(1, 150, 20, 500), (2, 75, 10, 200), (3, 120, 25, 400), (4, 90, 15, 300), (5, 50, 8, 150),
+(6, 200, 30, 600), (7, 40, 5, 100), (8, 180, 35, 500), (9, 85, 12, 250), (10, 160, 25, 450),
+(11, 250, 40, 800), (12, 120, 20, 400), (13, 200, 35, 600), (14, 100, 15, 300), (15, 80, 12, 250),
+(16, 300, 50, 1000), (17, 220, 40, 700), (18, 150, 25, 450), (19, 280, 45, 800), (20, 90, 15, 300);
+
+INSERT INTO admin_users (admin_id, username, email, password_hash, full_name, role, status) VALUES
+('admin-001', 'admin', 'admin@yourstore.com', '32768:8:1$ccz4yn7Em7OgVl78$00a5006966d4b4fb7fb7bb44e16738d9f4303236e6c6da1b4795647db2df96676d92f112f4c184402413814d7d1539af16ce329d0814e9b6d4b70acc52417978', 'System Administrator', 'super_admin', 'active');
+
+INSERT INTO promocodes (code, description, discount_type, discount_value, min_order_amount, max_discount_amount, usage_limit, valid_from, valid_until, status) VALUES
+('WELCOME10', 'Welcome discount - 10% off on first order', 'percentage', 10.00, 500.00, 200.00, 1000, NOW(), DATE_ADD(NOW(), INTERVAL 6 MONTH), 'active'),
+('HONEY50', 'Flat ₹50 off on honey products', 'fixed', 50.00, 300.00, 50.00, 500, NOW(), DATE_ADD(NOW(), INTERVAL 3 MONTH), 'active'),
+('NUTS20', '20% off on all nuts and dry fruits', 'percentage', 20.00, 400.00, 300.00, 200, NOW(), DATE_ADD(NOW(), INTERVAL 2 MONTH), 'active'),
+('COFFEE15', '15% off on premium coffee', 'percentage', 15.00, 600.00, 400.00, 150, NOW(), DATE_ADD(NOW(), INTERVAL 1 MONTH), 'active'),
+('SEEDS25', '25% off on superfood seeds', 'percentage', 25.00, 250.00, 200.00, 300, NOW(), DATE_ADD(NOW(), INTERVAL 4 MONTH), 'active'),
+('FREESHIP', 'Free shipping on all orders', 'fixed', 50.00, 0.00, 50.00, NULL, NOW(), DATE_ADD(NOW(), INTERVAL 12 MONTH), 'active');
+
+INSERT INTO users (user_id, email, password_hash, first_name, last_name, phone, created_at) VALUES
+('user-001', 'test@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewtnZ8h5Sf2NGhM2', 'Test', 'User', '9876543210', NOW()),
+('user-002', 'demo@example.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewtnZ8h5Sf2NGhM2', 'Demo', 'Customer', '9876543211', NOW());
+
+INSERT INTO referral_codes (user_id, code, status, created_at) VALUES
+('user-001', 'REFTES123', 'active', NOW()),
+('user-002', 'REFDEM456', 'active', NOW());
+
+INSERT INTO wallet (user_id, balance, created_at) VALUES
+('user-001', 150.00, NOW()),
+('user-002', 75.00, NOW());
+

@@ -1,74 +1,89 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
+import { Header } from "@/components/layout/header"
+import { Footer } from "@/components/layout/footer"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator"
+import { Package, Truck, CheckCircle, Clock, Eye } from "lucide-react"
+import { useAuth } from "@/lib/auth"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ChevronRight, Package, Clock, CheckCircle, AlertTriangle } from "lucide-react"
-import { api } from "@/lib/api"
-import { useAuth } from "@/contexts/AuthContext"
-import { Button } from "@/components/ui/Button"
-import { LoadingSpinner } from "@/components/ui/LoadingSpinner"
+import Image from "next/image"
 
 interface Order {
-  order_id: number
-  order_number: string
+  order_id: string
   order_date: string
-  total_amount: number
-  payment_method: string
-  status: string
-  items_count: number
+  status: "pending" | "confirmed" | "shipped" | "delivered" | "cancelled"
+  total: number
+  items: Array<{
+    product_id: number
+    product_name: string
+    quantity: number
+    price: number
+    image_url: string
+  }>
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
-  const { user } = useAuth()
-  const router = useRouter()
-
-  useEffect(() => {
-    if (!user) {
-      router.push("/login?redirect=/orders")
-      return
-    }
-
-    loadOrders()
-  }, [user, router])
-
-  const loadOrders = async () => {
-    try {
-      setLoading(true)
-      const response = await api.getOrders()
-      if (response.data?.orders) {
-        setOrders(response.data.orders)
-      }
-    } catch (error) {
-      console.error("Failed to load orders:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { isAuthenticated } = useAuth()
+  const [orders] = useState<Order[]>([
+    {
+      order_id: "ORD-2024-001",
+      order_date: "2024-01-15",
+      status: "delivered",
+      total: 1299,
+      items: [
+        {
+          product_id: 1,
+          product_name: "Raw Forest Honey",
+          quantity: 2,
+          price: 549,
+          image_url: "/placeholder.svg?height=80&width=80",
+        },
+      ],
+    },
+    {
+      order_id: "ORD-2024-002",
+      order_date: "2024-01-20",
+      status: "shipped",
+      total: 899,
+      items: [
+        {
+          product_id: 2,
+          product_name: "Premium Coffee Beans",
+          quantity: 1,
+          price: 899,
+          image_url: "/placeholder.svg?height=80&width=80",
+        },
+      ],
+    },
+  ])
 
   const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "processing":
-        return <Clock className="h-5 w-5 text-blue-500" />
+    switch (status) {
+      case "pending":
+        return <Clock className="h-4 w-4" />
+      case "confirmed":
+        return <CheckCircle className="h-4 w-4" />
       case "shipped":
-        return <Package className="h-5 w-5 text-orange-500" />
+        return <Truck className="h-4 w-4" />
       case "delivered":
-        return <CheckCircle className="h-5 w-5 text-green-500" />
-      case "cancelled":
-        return <AlertTriangle className="h-5 w-5 text-red-500" />
+        return <Package className="h-4 w-4" />
       default:
-        return <Clock className="h-5 w-5 text-gray-500" />
+        return <Clock className="h-4 w-4" />
     }
   }
 
-  const getStatusClass = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "processing":
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800"
+      case "confirmed":
         return "bg-blue-100 text-blue-800"
       case "shipped":
-        return "bg-orange-100 text-orange-800"
+        return "bg-purple-100 text-purple-800"
       case "delivered":
         return "bg-green-100 text-green-800"
       case "cancelled":
@@ -78,83 +93,104 @@ export default function OrdersPage() {
     }
   }
 
-  if (loading) {
+  if (!isAuthenticated) {
     return (
-      <div className="container py-16 min-h-[60vh] flex items-center justify-center">
-        <LoadingSpinner size="lg" />
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="container mx-auto px-4 py-16">
+          <div className="text-center">
+            <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Please Login</h1>
+            <p className="text-gray-600 mb-8">You need to login to view your orders</p>
+            <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
+              <Link href="/login">Login</Link>
+            </Button>
+          </div>
+        </div>
+        <Footer />
       </div>
     )
   }
 
   return (
-    <div className="container py-12">
-      <h1 className="text-3xl font-heading font-bold text-green-800 mb-8">My Orders</h1>
+    <div className="min-h-screen bg-gray-50">
+      <Header />
 
-      {orders.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <div className="flex justify-center mb-4">
-            <Package className="h-16 w-16 text-gray-300" />
+      <div className="container mx-auto px-4 py-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">My Orders</h1>
+
+        {orders.length === 0 ? (
+          <div className="text-center py-16">
+            <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">No Orders Yet</h2>
+            <p className="text-gray-600 mb-8">Start shopping to see your orders here</p>
+            <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
+              <Link href="/shop">Start Shopping</Link>
+            </Button>
           </div>
-          <h2 className="text-2xl font-heading font-bold text-green-800 mb-4">No orders yet</h2>
-          <p className="text-green-700 mb-8">
-            You haven't placed any orders yet. Start shopping to see your orders here.
-          </p>
-          <Link href="/shop">
-            <Button size="lg">Start Shopping</Button>
-          </Link>
-        </div>
-      ) : (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-green-50 border-b border-green-100">
-                <tr>
-                  <th className="py-4 px-6 text-left text-sm font-medium text-green-800">Order</th>
-                  <th className="py-4 px-6 text-left text-sm font-medium text-green-800">Date</th>
-                  <th className="py-4 px-6 text-left text-sm font-medium text-green-800">Status</th>
-                  <th className="py-4 px-6 text-left text-sm font-medium text-green-800">Total</th>
-                  <th className="py-4 px-6 text-right text-sm font-medium text-green-800">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-green-100">
-                {orders.map((order) => (
-                  <tr key={order.order_id} className="hover:bg-green-50/50 transition-colors">
-                    <td className="py-4 px-6">
-                      <div className="flex items-center space-x-3">
-                        <span className="font-medium text-green-800">{order.order_number}</span>
-                        <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full">
-                          {order.items_count} {order.items_count === 1 ? "item" : "items"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-green-700">{new Date(order.order_date).toLocaleDateString()}</td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center space-x-2">
+        ) : (
+          <div className="space-y-6">
+            {orders.map((order) => (
+              <Card key={order.order_id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Order #{order.order_id}</CardTitle>
+                      <p className="text-sm text-gray-500">
+                        Placed on {new Date(order.order_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <Badge className={getStatusColor(order.status)}>
                         {getStatusIcon(order.status)}
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusClass(
-                            order.status,
-                          )}`}
-                        >
-                          {order.status}
-                        </span>
+                        <span className="ml-1 capitalize">{order.status}</span>
+                      </Badge>
+                      <Button asChild variant="outline" size="sm">
+                        <Link href={`/orders/${order.order_id}`}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Details
+                        </Link>
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {order.items.map((item, index) => (
+                      <div key={index} className="flex items-center space-x-4">
+                        <div className="relative w-16 h-16 flex-shrink-0">
+                          <Image
+                            src={item.image_url || "/placeholder.svg"}
+                            alt={item.product_name}
+                            fill
+                            className="object-cover rounded-lg"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="font-medium">{item.product_name}</h4>
+                          <p className="text-sm text-gray-500">Quantity: {item.quantity}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">₹{(item.price * item.quantity).toFixed(0)}</p>
+                        </div>
                       </div>
-                    </td>
-                    <td className="py-4 px-6 font-medium text-green-800">₹{order.total_amount.toFixed(2)}</td>
-                    <td className="py-4 px-6 text-right">
-                      <Link href={`/orders/${order.order_id}`}>
-                        <Button variant="outline" size="sm">
-                          View Details <ChevronRight className="ml-1 h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    ))}
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Total Amount</span>
+                    <span className="text-xl font-bold text-emerald-600">₹{order.total.toFixed(0)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
+
+      <Footer />
     </div>
   )
 }
