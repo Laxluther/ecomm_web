@@ -1,12 +1,18 @@
 import mysql.connector
-from config import Config
-from functools import wraps
-import jwt
-from flask import request, jsonify, current_app
 from datetime import datetime
 import uuid
+import os
+
+# Database connection configuration
+class Config:
+    DB_HOST = os.environ.get('DB_HOST', 'localhost')
+    DB_USER = os.environ.get('DB_USER', 'root')
+    DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
+    DB_NAME = os.environ.get('DB_NAME', 'ecommerce')
+    DB_PORT = int(os.environ.get('DB_PORT', 3306))
 
 def get_db_connection():
+    """Get database connection"""
     return mysql.connector.connect(
         host=Config.DB_HOST,
         user=Config.DB_USER,
@@ -16,81 +22,89 @@ def get_db_connection():
         charset='utf8mb4',
         collation='utf8mb4_unicode_ci',
         auth_plugin='mysql_native_password',
-        use_pure=True
+        use_pure=True,
+        autocommit=False
     )
 
-def execute_query(query, params=None, fetch_one=False, fetch_all=False):
-    conn = get_db_connection()
-    cursor = conn.cursor(dictionary=True)
-    cursor.execute(query, params or ())
+def execute_query(query, params=None, fetch_one=False, fetch_all=False, get_insert_id=False):
+    """
+    Execute database query with various return options
     
-    if fetch_one:
-        result = cursor.fetchone()
-    elif fetch_all:
-        result = cursor.fetchall()
-    else:
-        result = cursor.lastrowid
+    Args:
+        query: SQL query string
+        params: Query parameters tuple/list
+        fetch_one: Return single row as dict
+        fetch_all: Return all rows as list of dicts
+        get_insert_id: Return the inserted row ID (for INSERT queries)
     
-    conn.commit()
-    cursor.close()
-    conn.close()
-    return result
-
-def user_token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
-            return jsonify({'error': 'Token missing'}), 401
-        if token.startswith('Bearer '):
-            token = token[7:]
+    Returns:
+        - If fetch_one: dict or None
+        - If fetch_all: list of dicts
+        - If get_insert_id: integer ID of inserted row
+        - Default: lastrowid (for INSERT) or rowcount (for UPDATE/DELETE)
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
         
-        data = jwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
-        current_user_id = data['user_id']
-        return f(current_user_id, *args, **kwargs)
-    return decorated
-
-def admin_token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization')
-        if not token:
-            return jsonify({'error': 'Admin token missing'}), 401
-        if token.startswith('Bearer '):
-            token = token[7:]
+        cursor.execute(query, params or ())
         
-        data = jwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
-        admin_id = data.get('admin_id')
-        if not admin_id:
-            return jsonify({'error': 'Admin access required'}), 403
+        if fetch_one:
+            result = cursor.fetchone()
+        elif fetch_all:
+            result = cursor.fetchall()
+        elif get_insert_id:
+            result = cursor.lastrowid
+        else:
+            result = cursor.lastrowid if query.strip().upper().startswith('INSERT') else cursor.rowcount
         
-        admin = execute_query(
-            "SELECT * FROM admin_users WHERE admin_id = %s AND status = 'active'",
-            (admin_id,), fetch_one=True
-        )
-        if not admin:
-            return jsonify({'error': 'Invalid admin access'}), 403
-        return f(admin_id, *args, **kwargs)
-    return decorated
+        conn.commit()
+        return result
+        
+    except mysql.connector.Error as e:
+        if conn:
+            conn.rollback()
+        print(f"Database error: {e}")
+        raise e
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        print(f"Unexpected error: {e}")
+        raise e
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 class BaseModel:
+    """Base model with common utilities"""
+    
     @staticmethod
     def create_id():
+        """Generate unique UUID"""
         return str(uuid.uuid4())
     
     @staticmethod
     def current_time():
+        """Get current timestamp"""
         return datetime.now()
 
 class ProductModel(BaseModel):
+    """Product model with database operations"""
+    
     @staticmethod
     def get_all_active():
+        """Get all active products"""
         return execute_query("""
             SELECT p.*, c.category_name,
                    (SELECT pi.image_url FROM product_images pi 
                     WHERE pi.product_id = p.product_id AND pi.is_primary = 1 
                     LIMIT 1) as primary_image,
-                   (SELECT i.quantity FROM inventory i WHERE i.product_id = p.product_id) as stock
+                   (SELECT i.quantity FROM inventory i 
+                    WHERE i.product_id = p.product_id) as stock
             FROM products p 
             LEFT JOIN categories c ON p.category_id = c.category_id
             WHERE p.status = 'active' AND c.status = 'active'
@@ -99,6 +113,7 @@ class ProductModel(BaseModel):
     
     @staticmethod
     def get_featured():
+        """Get featured products"""
         return execute_query("""
             SELECT p.*, c.category_name,
                    (SELECT pi.image_url FROM product_images pi 
@@ -112,17 +127,22 @@ class ProductModel(BaseModel):
     
     @staticmethod
     def get_by_id(product_id):
+        """Get product by ID"""
         return execute_query("""
             SELECT p.*, c.category_name,
-                   (SELECT i.quantity FROM inventory i WHERE i.product_id = p.product_id) as stock
+                   (SELECT i.quantity FROM inventory i 
+                    WHERE i.product_id = p.product_id) as stock
             FROM products p 
-            JOIN categories c ON p.category_id = c.category_id 
+            LEFT JOIN categories c ON p.category_id = c.category_id 
             WHERE p.product_id = %s AND p.status = 'active'
         """, (product_id,), fetch_one=True)
 
 class UserModel(BaseModel):
+    """User model with database operations"""
+    
     @staticmethod
     def create(email, password_hash, first_name, last_name, phone, referral_code=None):
+        """Create new user"""
         user_id = UserModel.create_id()
         
         execute_query("""
@@ -130,22 +150,23 @@ class UserModel(BaseModel):
             VALUES (%s, %s, %s, %s, %s, %s, %s)
         """, (user_id, email, password_hash, first_name, last_name, phone, UserModel.current_time()))
         
+        # Handle referral if provided
         if referral_code:
             referrer = execute_query("""
-                SELECT user_id FROM referral_codes WHERE code = %s AND status = 'active'
+                SELECT user_id FROM users WHERE referral_code = %s AND status = 'active'
             """, (referral_code,), fetch_one=True)
             
             if referrer:
                 execute_query("""
-                    INSERT INTO referral_uses (referral_code_id, referred_user_id, created_at)
-                    SELECT rc.id, %s, %s
-                    FROM referral_codes rc WHERE rc.code = %s
-                """, (user_id, UserModel.current_time(), referral_code))
+                    INSERT INTO referral_uses (referrer_id, referred_user_id, created_at)
+                    VALUES (%s, %s, %s)
+                """, (referrer['user_id'], user_id, UserModel.current_time()))
         
         return user_id
     
     @staticmethod
     def get_by_email(email):
+        """Get user by email"""
         return execute_query(
             "SELECT * FROM users WHERE email = %s AND status = 'active'",
             (email,), fetch_one=True
@@ -153,14 +174,18 @@ class UserModel(BaseModel):
     
     @staticmethod
     def get_by_id(user_id):
+        """Get user by ID"""
         return execute_query(
             "SELECT * FROM users WHERE user_id = %s",
             (user_id,), fetch_one=True
         )
 
 class AdminModel(BaseModel):
+    """Admin model with database operations"""
+    
     @staticmethod
     def get_by_username(username):
+        """Get admin by username"""
         return execute_query(
             "SELECT * FROM admin_users WHERE username = %s AND status = 'active'",
             (username,), fetch_one=True
@@ -168,7 +193,78 @@ class AdminModel(BaseModel):
     
     @staticmethod
     def get_by_id(admin_id):
+        """Get admin by ID"""
         return execute_query(
             "SELECT * FROM admin_users WHERE admin_id = %s",
             (admin_id,), fetch_one=True
         )
+
+class CategoryModel(BaseModel):
+    """Category model with database operations"""
+    
+    @staticmethod
+    def get_all_active():
+        """Get all active categories"""
+        return execute_query("""
+            SELECT c.*, 
+                   (SELECT COUNT(*) FROM products p 
+                    WHERE p.category_id = c.category_id AND p.status = 'active') as product_count
+            FROM categories c
+            WHERE c.status = 'active' 
+            ORDER BY c.sort_order, c.category_name
+        """, fetch_all=True)
+    
+    @staticmethod
+    def get_by_id(category_id):
+        """Get category by ID"""
+        return execute_query(
+            "SELECT * FROM categories WHERE category_id = %s",
+            (category_id,), fetch_one=True
+        )
+
+class OrderModel(BaseModel):
+    """Order model with database operations"""
+    
+    @staticmethod
+    def create_order(user_id, order_data):
+        """Create new order"""
+        order_id = OrderModel.create_id()
+        
+        execute_query("""
+            INSERT INTO orders (
+                order_id, user_id, order_number, status, subtotal, 
+                shipping_amount, total_amount, payment_method, 
+                payment_status, shipping_address, created_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            order_id, user_id, order_data['order_number'], 'pending',
+            order_data['subtotal'], order_data['shipping_amount'], 
+            order_data['total_amount'], order_data['payment_method'],
+            'pending', order_data['shipping_address'], OrderModel.current_time()
+        ))
+        
+        return order_id
+    
+    @staticmethod
+    def get_by_user(user_id):
+        """Get orders by user ID"""
+        return execute_query("""
+            SELECT o.*, COUNT(oi.order_item_id) as item_count
+            FROM orders o 
+            LEFT JOIN order_items oi ON o.order_id = oi.order_id
+            WHERE o.user_id = %s
+            GROUP BY o.order_id
+            ORDER BY o.created_at DESC
+        """, (user_id,), fetch_all=True)
+
+# Legacy authentication decorators (kept for compatibility)
+# Note: These are now moved to shared/auth.py but kept here for backward compatibility
+def user_token_required(f):
+    """Deprecated: Use shared.auth.user_token_required instead"""
+    from shared.auth import user_token_required as new_decorator
+    return new_decorator(f)
+
+def admin_token_required(f):
+    """Deprecated: Use shared.auth.admin_token_required instead"""
+    from shared.auth import admin_token_required as new_decorator
+    return new_decorator(f)

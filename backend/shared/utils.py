@@ -1,244 +1,180 @@
-from datetime import datetime
-import random
-import json
-from shared.models import execute_query
-from config import Config
+import jwt
+import re
+import uuid
+import smtplib
+from datetime import datetime, timedelta
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask import current_app
+import os
 
-def generate_order_number():
-    date_part = datetime.now().strftime('%Y%m%d')
-    random_part = random.randint(1000, 9999)
-    return f"ORD{date_part}{random_part}"
+# Password utilities
+def hash_password(password):
+    """Hash a password for storing"""
+    return generate_password_hash(password)
 
-def get_state_code_from_state_name(state_input):
-    if not state_input:
-        return 'MH'
-    
-    if len(state_input) == 2 and state_input.isupper():
-        return state_input
-    
-    state_mapping = {
-        'Andhra Pradesh': 'AP', 'Arunachal Pradesh': 'AR', 'Assam': 'AS', 'Bihar': 'BR',
-        'Chhattisgarh': 'CG', 'Goa': 'GA', 'Gujarat': 'GJ', 'Haryana': 'HR', 
-        'Himachal Pradesh': 'HP', 'Jharkhand': 'JH', 'Karnataka': 'KA', 'Kerala': 'KL',
-        'Madhya Pradesh': 'MP', 'Maharashtra': 'MH', 'Manipur': 'MN', 'Meghalaya': 'ML',
-        'Mizoram': 'MZ', 'Nagaland': 'NL', 'Odisha': 'OR', 'Punjab': 'PB', 
-        'Rajasthan': 'RJ', 'Sikkim': 'SK', 'Tamil Nadu': 'TN', 'Telangana': 'TS',
-        'Tripura': 'TR', 'Uttar Pradesh': 'UP', 'Uttarakhand': 'UK', 'West Bengal': 'WB',
-        'Delhi': 'DL', 'Jammu and Kashmir': 'JK'
+def verify_password(password, hash):
+    """Verify a password against its hash"""
+    return check_password_hash(hash, password)
+
+# JWT Token utilities
+def generate_token(user_id, user_type='user', expiry_hours=24):
+    """Generate JWT token for user or admin"""
+    payload = {
+        'exp': datetime.utcnow() + timedelta(hours=expiry_hours),
+        'iat': datetime.utcnow(),
+        'user_type': user_type
     }
     
-    return state_mapping.get(state_input, 'MH')
+    if user_type == 'admin':
+        payload['admin_id'] = user_id
+    else:
+        payload['user_id'] = user_id
+    
+    return jwt.encode(
+        payload,
+        current_app.config['JWT_SECRET_KEY'],
+        algorithm='HS256'
+    )
 
-def calculate_order_totals(cart_items, customer_state, applied_promocode=None):
-    customer_state_code = get_state_code_from_state_name(customer_state)
-    business_state = Config.BUSINESS_STATE_CODE
-    
-    subtotal = 0
-    total_cgst = 0
-    total_sgst = 0
-    total_igst = 0
-    
-    for item in cart_items:
-        item_price = float(item['discount_price']) if item['discount_price'] else float(item['price'])
-        quantity = item['quantity']
-        gst_rate = float(item.get('gst_rate', 5.0))
-        item_total = item_price * quantity
-        
-        subtotal += item_total
-        
-        if customer_state_code == business_state:
-            cgst = (item_total * gst_rate / 2) / 100
-            sgst = (item_total * gst_rate / 2) / 100
-            total_cgst += cgst
-            total_sgst += sgst
-        else:
-            igst = (item_total * gst_rate) / 100
-            total_igst += igst
-    
-    shipping_amount = 0 if subtotal >= Config.FREE_DELIVERY_THRESHOLD else Config.STANDARD_DELIVERY_CHARGE
-    
-    discount_amount = 0
-    if applied_promocode:
-        if subtotal >= applied_promocode['min_order_amount']:
-            if applied_promocode['discount_type'] == 'percentage':
-                discount_amount = subtotal * (applied_promocode['discount_value'] / 100)
-                if applied_promocode['max_discount_amount'] > 0:
-                    discount_amount = min(discount_amount, applied_promocode['max_discount_amount'])
-            else:
-                discount_amount = min(applied_promocode['discount_value'], subtotal)
-    
-    tax_amount = total_cgst + total_sgst + total_igst
-    total_amount = subtotal + tax_amount + shipping_amount - discount_amount
-    
-    return {
-        'subtotal': round(subtotal, 2),
-        'tax_amount': round(tax_amount, 2),
-        'cgst_amount': round(total_cgst, 2),
-        'sgst_amount': round(total_sgst, 2), 
-        'igst_amount': round(total_igst, 2),
-        'shipping_amount': round(shipping_amount, 2),
-        'discount_amount': round(discount_amount, 2),
-        'total_amount': round(total_amount, 2)
-    }
+def decode_token(token):
+    """Decode JWT token"""
+    try:
+        return jwt.decode(
+            token,
+            current_app.config['JWT_SECRET_KEY'],
+            algorithms=['HS256']
+        )
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
 
-def validate_promocode(code, subtotal, user_id=None):
-    promocode = execute_query("""
-        SELECT * FROM promocodes 
-        WHERE code = %s AND status = 'active' 
-        AND valid_from <= NOW() AND valid_until >= NOW()
-        AND (usage_limit IS NULL OR used_count < usage_limit)
-    """, (code.upper(),), fetch_one=True)
-    
-    if not promocode:
-        return None, 'Invalid or expired promocode'
-    
-    min_order = float(promocode.get('min_order_amount') or 0)
-    if subtotal < min_order:
-        return None, f'Minimum order amount ₹{min_order} required'
-    
-    return {
-        'code': promocode['code'],
-        'discount_type': promocode['discount_type'],
-        'discount_value': float(promocode['discount_value']),
-        'min_order_amount': min_order,
-        'max_discount_amount': float(promocode.get('max_discount_amount') or 0)
-    }, 'Valid promocode'
-
-def process_wallet_payment(user_id, amount):
-    wallet = execute_query("SELECT balance FROM wallet WHERE user_id = %s", (user_id,), fetch_one=True)
-    current_balance = float(wallet['balance']) if wallet else 0.0
-    
-    if current_balance < amount:
-        return False, f'Insufficient wallet balance. Available: ₹{current_balance}'
-    
-    new_balance = current_balance - amount
-    execute_query("UPDATE wallet SET balance = %s, updated_at = %s WHERE user_id = %s", 
-                 (new_balance, datetime.now(), user_id))
-    
-    transaction_id = str(__import__('uuid').uuid4())
-    execute_query("""
-        INSERT INTO wallet_transactions 
-        (transaction_id, user_id, transaction_type, amount, balance_after, 
-         description, reference_type, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """, (transaction_id, user_id, 'debit', amount, new_balance,
-          'Payment for order', 'order', datetime.now()))
-    
-    return True, 'Payment successful'
-
-def check_inventory_availability(product_id, quantity):
-    inventory = execute_query("""
-        SELECT quantity, reserved_quantity 
-        FROM inventory 
-        WHERE product_id = %s
-    """, (product_id,), fetch_one=True)
-    
-    if not inventory:
-        return False, "Product not found in inventory"
-    
-    available_stock = inventory['quantity'] - inventory['reserved_quantity']
-    
-    if available_stock < quantity:
-        return False, f"Only {available_stock} units available"
-    
-    return True, "Stock available"
-
-def update_inventory(product_id, quantity, operation='decrease'):
-    if operation == 'decrease':
-        execute_query("""
-            UPDATE inventory 
-            SET quantity = quantity - %s, reserved_quantity = reserved_quantity + %s
-            WHERE product_id = %s
-        """, (quantity, quantity, product_id))
-    elif operation == 'increase':
-        execute_query("""
-            UPDATE inventory 
-            SET quantity = quantity + %s, reserved_quantity = reserved_quantity - %s
-            WHERE product_id = %s
-        """, (quantity, quantity, product_id))
-
-def get_indian_states():
-    return {
-        'AN': 'Andaman and Nicobar Islands', 'AP': 'Andhra Pradesh', 'AR': 'Arunachal Pradesh',
-        'AS': 'Assam', 'BR': 'Bihar', 'CH': 'Chandigarh', 'CG': 'Chhattisgarh',
-        'DN': 'Dadra and Nagar Haveli', 'DD': 'Daman and Diu', 'DL': 'Delhi',
-        'GA': 'Goa', 'GJ': 'Gujarat', 'HR': 'Haryana', 'HP': 'Himachal Pradesh',
-        'JK': 'Jammu and Kashmir', 'JH': 'Jharkhand', 'KA': 'Karnataka', 'KL': 'Kerala',
-        'LD': 'Lakshadweep', 'MP': 'Madhya Pradesh', 'MH': 'Maharashtra', 'MN': 'Manipur',
-        'ML': 'Meghalaya', 'MZ': 'Mizoram', 'NL': 'Nagaland', 'OR': 'Odisha',
-        'PY': 'Puducherry', 'PB': 'Punjab', 'RJ': 'Rajasthan', 'SK': 'Sikkim',
-        'TN': 'Tamil Nadu', 'TS': 'Telangana', 'TR': 'Tripura', 'UP': 'Uttar Pradesh',
-        'UK': 'Uttarakhand', 'WB': 'West Bengal'
-    }
-
-def sanitize_filename(filename):
-    import re
-    import os
-    name, ext = os.path.splitext(filename)
-    name = re.sub(r'[^\w\-_\.]', '_', name)
-    return f"{name}{ext}"
-
-def format_currency(amount):
-    return f"₹{float(amount):,.2f}"
-
-def format_date(date_obj):
-    if isinstance(date_obj, str):
-        date_obj = datetime.fromisoformat(date_obj.replace('Z', '+00:00'))
-    return date_obj.strftime('%B %d, %Y')
-
-def format_datetime(datetime_obj):
-    if isinstance(datetime_obj, str):
-        datetime_obj = datetime.fromisoformat(datetime_obj.replace('Z', '+00:00'))
-    return datetime_obj.strftime('%B %d, %Y at %I:%M %p')
-
-def calculate_discount_percentage(original_price, discounted_price):
-    if not original_price or not discounted_price:
-        return 0
-    return round(((float(original_price) - float(discounted_price)) / float(original_price)) * 100, 1)
-
-def generate_sku(category_name, product_name):
-    import re
-    category_code = re.sub(r'[^\w]', '', category_name)[:3].upper()
-    product_code = re.sub(r'[^\w]', '', product_name)[:3].upper()
-    random_num = random.randint(100, 999)
-    return f"{category_code}{product_code}{random_num}"
-
-def validate_phone_number(phone):
-    import re
-    phone_pattern = re.compile(r'^[6-9]\d{9}$')
-    return bool(phone_pattern.match(phone))
-
+# Validation utilities
 def validate_email(email):
-    import re
+    """Validate email format"""
     email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
     return bool(email_pattern.match(email))
 
+def validate_phone(phone):
+    """Validate Indian phone number format"""
+    phone_pattern = re.compile(r'^[6-9]\d{9}$')
+    return bool(phone_pattern.match(phone))
+
 def validate_pincode(pincode):
-    import re
+    """Validate Indian pincode format"""
     pincode_pattern = re.compile(r'^\d{6}$')
     return bool(pincode_pattern.match(pincode))
 
-def get_order_status_color(status):
-    status_colors = {
-        'pending': '#fbbf24',
-        'confirmed': '#3b82f6',
-        'processing': '#8b5cf6',
-        'shipped': '#06b6d4',
-        'delivered': '#10b981',
-        'cancelled': '#ef4444',
-        'refunded': '#f59e0b'
-    }
-    return status_colors.get(status, '#6b7280')
+# Email utilities
+def send_email(to_email, subject, html_content, text_content=None):
+    """Send email using SMTP"""
+    try:
+        smtp_server = current_app.config.get('MAIL_SERVER', 'smtp.gmail.com')
+        smtp_port = current_app.config.get('MAIL_PORT', 587)
+        smtp_username = current_app.config.get('MAIL_USERNAME')
+        smtp_password = current_app.config.get('MAIL_PASSWORD')
+        from_email = current_app.config.get('MAIL_DEFAULT_SENDER', smtp_username)
+        
+        if not all([smtp_username, smtp_password, from_email]):
+            print("Email configuration missing")
+            return False
+        
+        # Create message
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = from_email
+        msg['To'] = to_email
+        
+        # Add text content
+        if text_content:
+            text_part = MIMEText(text_content, 'plain')
+            msg.attach(text_part)
+        
+        # Add HTML content
+        html_part = MIMEText(html_content, 'html')
+        msg.attach(html_part)
+        
+        # Send email
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_username, smtp_password)
+        server.send_message(msg)
+        server.quit()
+        
+        return True
+    except Exception as e:
+        print(f"Email sending failed: {str(e)}")
+        return False
 
+# ID generation utilities
+def generate_user_id():
+    """Generate unique user ID"""
+    return str(uuid.uuid4())
+
+def generate_order_id():
+    """Generate unique order ID"""
+    return str(uuid.uuid4())
+
+def generate_order_number():
+    """Generate human-readable order number"""
+    timestamp = datetime.now().strftime('%Y%m%d')
+    random_part = str(uuid.uuid4())[:8].upper()
+    return f"ORD{timestamp}{random_part}"
+
+def generate_referral_code():
+    """Generate referral code"""
+    return f"REF{uuid.uuid4().hex[:8].upper()}"
+
+# Status and display utilities
+def get_order_status_color(status):
+    """Get color code for order status"""
+    status_colors = {
+        'pending': '#fbbf24',      # yellow
+        'confirmed': '#3b82f6',    # blue
+        'processing': '#8b5cf6',   # purple
+        'shipped': '#06b6d4',      # cyan
+        'delivered': '#10b981',    # green
+        'cancelled': '#ef4444',    # red
+        'refunded': '#f59e0b'      # orange
+    }
+    return status_colors.get(status, '#6b7280')  # gray default
+
+def format_currency(amount, currency='₹'):
+    """Format amount as currency"""
+    if amount is None:
+        return f"{currency}0.00"
+    return f"{currency}{float(amount):.2f}"
+
+def calculate_savings(original_price, discount_price):
+    """Calculate savings amount and percentage"""
+    if not discount_price or not original_price:
+        return {'amount': 0, 'percentage': 0}
+    
+    savings_amount = float(original_price) - float(discount_price)
+    savings_percentage = (savings_amount / float(original_price)) * 100
+    
+    return {
+        'amount': round(savings_amount, 2),
+        'percentage': round(savings_percentage, 1)
+    }
+
+# Pagination utilities
 def paginate_results(query, params, page=1, per_page=20):
+    """Paginate database query results"""
+    from shared.models import execute_query
+    
     offset = (page - 1) * per_page
     
+    # Get total count
     count_query = query.replace('SELECT *', 'SELECT COUNT(*) as total', 1)
     if 'ORDER BY' in count_query:
         count_query = count_query.split('ORDER BY')[0]
     
     total_count = execute_query(count_query, params, fetch_one=True)['total']
     
+    # Get paginated results
     paginated_query = f"{query} LIMIT {per_page} OFFSET {offset}"
     results = execute_query(paginated_query, params, fetch_all=True)
     
@@ -254,7 +190,10 @@ def paginate_results(query, params, page=1, per_page=20):
         }
     }
 
+# API Response utilities
 class APIResponse:
+    """Standard API response formatter"""
+    
     @staticmethod
     def success(data=None, message="Success", status_code=200):
         response = {'success': True, 'message': message}
@@ -284,3 +223,67 @@ class APIResponse:
     @staticmethod
     def validation_error(errors, message="Validation failed"):
         return APIResponse.error(message, 422, errors)
+
+# File utilities
+def allowed_file(filename, allowed_extensions=None):
+    """Check if file has allowed extension"""
+    if allowed_extensions is None:
+        allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+    
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in allowed_extensions
+
+def get_file_size_mb(file):
+    """Get file size in MB"""
+    file.seek(0, 2)  # Seek to end
+    size = file.tell()
+    file.seek(0)     # Seek back to beginning
+    return size / (1024 * 1024)
+
+# Security utilities
+def generate_verification_token():
+    """Generate email verification token"""
+    return str(uuid.uuid4())
+
+def generate_reset_token():
+    """Generate password reset token"""
+    return str(uuid.uuid4())
+
+# Date utilities
+def get_current_timestamp():
+    """Get current timestamp"""
+    return datetime.now()
+
+def format_date(date_obj, format_str='%Y-%m-%d'):
+    """Format date object"""
+    if not date_obj:
+        return None
+    return date_obj.strftime(format_str)
+
+def format_datetime(datetime_obj, format_str='%Y-%m-%d %H:%M:%S'):
+    """Format datetime object"""
+    if not datetime_obj:
+        return None
+    return datetime_obj.strftime(format_str)
+
+# Business logic utilities
+def calculate_delivery_charge(subtotal, free_delivery_threshold=500):
+    """Calculate delivery charge based on subtotal"""
+    delivery_charge = current_app.config.get('STANDARD_DELIVERY_CHARGE', 50)
+    threshold = current_app.config.get('FREE_DELIVERY_THRESHOLD', free_delivery_threshold)
+    
+    return 0 if subtotal >= threshold else delivery_charge
+
+def calculate_order_total(subtotal, delivery_charge=0, discount_amount=0):
+    """Calculate final order total"""
+    return max(0, subtotal + delivery_charge - discount_amount)
+
+# Cache utilities
+def get_cache_key(prefix, *args):
+    """Generate cache key"""
+    return f"{prefix}_{':'.join(str(arg) for arg in args)}"
+
+def clear_related_cache(cache, patterns):
+    """Clear cache entries matching patterns"""
+    for pattern in patterns:
+        cache.delete(pattern)

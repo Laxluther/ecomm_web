@@ -1,7 +1,8 @@
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 from flask_caching import Cache
 from config import get_config
+import os
 
 def create_app():
     app = Flask(__name__)
@@ -27,6 +28,20 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(user_bp, url_prefix='/api/user')
     app.register_blueprint(shared_bp, url_prefix='/api')
+    
+    # Serve static files (images) - CRITICAL FOR IMAGE SERVING
+    @app.route('/static/uploads/<path:filename>')
+    def uploaded_file(filename):
+        upload_folder = app.config.get('UPLOAD_FOLDER', './static/uploads')
+        # Handle relative path
+        if upload_folder.startswith('./'):
+            upload_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), upload_folder[2:])
+        return send_from_directory(upload_folder, filename, as_attachment=False)
+    
+    # Health check endpoint
+    @app.route('/health')
+    def health_check():
+        return {'status': 'healthy', 'message': 'E-commerce API is running'}, 200
     
     return app
 

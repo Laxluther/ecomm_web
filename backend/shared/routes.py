@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify
 from shared.models import execute_query
+from shared.image_utils import convert_products_images, convert_category_images, convert_product_images, convert_image_url
 from datetime import datetime
 
 shared_bp = Blueprint('shared', __name__)
@@ -25,6 +26,9 @@ def public_featured_products():
         ORDER BY p.created_at DESC LIMIT 6
     """, fetch_all=True)
     
+    # Convert image URLs to absolute URLs
+    products = convert_products_images(products)
+    
     return jsonify({'products': products}), 200
 
 @shared_bp.route('/public/categories', methods=['GET'])
@@ -36,68 +40,82 @@ def public_categories():
         ORDER BY sort_order, category_name
     """, fetch_all=True)
     
+    # Convert image URLs to absolute URLs
+    categories = convert_category_images(categories)
+    
     return jsonify({'categories': categories}), 200
 
 @shared_bp.route('/public/products/<int:product_id>', methods=['GET'])
 def public_product_detail(product_id):
     product = execute_query("""
-        SELECT p.*, c.category_name
+        SELECT p.*, c.category_name,
+               (SELECT pi.image_url FROM product_images pi 
+                WHERE pi.product_id = p.product_id AND pi.is_primary = 1 
+                LIMIT 1) as primary_image
         FROM products p 
-        JOIN categories c ON p.category_id = c.category_id 
+        LEFT JOIN categories c ON p.category_id = c.category_id
         WHERE p.product_id = %s AND p.status = 'active'
     """, (product_id,), fetch_one=True)
     
     if not product:
         return jsonify({'error': 'Product not found'}), 404
     
+    # Get all product images
     images = execute_query("""
-        SELECT image_url, alt_text FROM product_images 
+        SELECT image_url, alt_text, is_primary, sort_order
+        FROM product_images 
         WHERE product_id = %s 
         ORDER BY sort_order, is_primary DESC
     """, (product_id,), fetch_all=True)
     
-    return jsonify({
-        'product': product,
-        'images': images
-    }), 200
-
-@shared_bp.route('/track-order', methods=['POST'])
-def track_order():
-    from flask import request
-    data = request.get_json()
-    order_number = data.get('order_number')
-    phone = data.get('phone')
+    # Convert image URLs to absolute URLs
+    product = convert_product_images(product)
+    for img in images:
+        img['image_url'] = convert_image_url(img['image_url'])
     
-    if not order_number:
-        return jsonify({'error': 'Order number required'}), 400
+    product['images'] = images
     
-    order = execute_query("""
-        SELECT o.order_number, o.status, o.total_amount, o.created_at,
-               o.shipping_address, u.phone as user_phone
-        FROM orders o 
-        LEFT JOIN users u ON o.user_id = u.user_id 
-        WHERE o.order_number = %s
-    """, (order_number,), fetch_one=True)
-    
-    if not order:
-        return jsonify({'error': 'Order not found'}), 404
-    
-    if phone and order.get('user_phone') != phone:
-        return jsonify({'error': 'Invalid phone number'}), 403
-    
-    return jsonify({'order': order}), 200
+    return jsonify({'product': product}), 200
 
 @shared_bp.route('/states', methods=['GET'])
 def get_indian_states():
-    states = {
-        'AP': 'Andhra Pradesh', 'AR': 'Arunachal Pradesh', 'AS': 'Assam', 'BR': 'Bihar',
-        'CG': 'Chhattisgarh', 'GA': 'Goa', 'GJ': 'Gujarat', 'HR': 'Haryana', 
-        'HP': 'Himachal Pradesh', 'JH': 'Jharkhand', 'KA': 'Karnataka', 'KL': 'Kerala',
-        'MP': 'Madhya Pradesh', 'MH': 'Maharashtra', 'MN': 'Manipur', 'ML': 'Meghalaya',
-        'MZ': 'Mizoram', 'NL': 'Nagaland', 'OR': 'Odisha', 'PB': 'Punjab', 
-        'RJ': 'Rajasthan', 'SK': 'Sikkim', 'TN': 'Tamil Nadu', 'TS': 'Telangana',
-        'TR': 'Tripura', 'UP': 'Uttar Pradesh', 'UK': 'Uttarakhand', 'WB': 'West Bengal',
-        'DL': 'Delhi'
-    }
+    states = [
+        {"code": "AN", "name": "Andaman and Nicobar Islands"},
+        {"code": "AP", "name": "Andhra Pradesh"},
+        {"code": "AR", "name": "Arunachal Pradesh"},
+        {"code": "AS", "name": "Assam"},
+        {"code": "BR", "name": "Bihar"},
+        {"code": "CH", "name": "Chandigarh"},
+        {"code": "CT", "name": "Chhattisgarh"},
+        {"code": "DN", "name": "Dadra and Nagar Haveli"},
+        {"code": "DD", "name": "Daman and Diu"},
+        {"code": "DL", "name": "Delhi"},
+        {"code": "GA", "name": "Goa"},
+        {"code": "GJ", "name": "Gujarat"},
+        {"code": "HR", "name": "Haryana"},
+        {"code": "HP", "name": "Himachal Pradesh"},
+        {"code": "JK", "name": "Jammu and Kashmir"},
+        {"code": "JH", "name": "Jharkhand"},
+        {"code": "KA", "name": "Karnataka"},
+        {"code": "KL", "name": "Kerala"},
+        {"code": "LD", "name": "Lakshadweep"},
+        {"code": "MP", "name": "Madhya Pradesh"},
+        {"code": "MH", "name": "Maharashtra"},
+        {"code": "MN", "name": "Manipur"},
+        {"code": "ML", "name": "Meghalaya"},
+        {"code": "MZ", "name": "Mizoram"},
+        {"code": "NL", "name": "Nagaland"},
+        {"code": "OR", "name": "Odisha"},
+        {"code": "PY", "name": "Puducherry"},
+        {"code": "PB", "name": "Punjab"},
+        {"code": "RJ", "name": "Rajasthan"},
+        {"code": "SK", "name": "Sikkim"},
+        {"code": "TN", "name": "Tamil Nadu"},
+        {"code": "TG", "name": "Telangana"},
+        {"code": "TR", "name": "Tripura"},
+        {"code": "UP", "name": "Uttar Pradesh"},
+        {"code": "UT", "name": "Uttarakhand"},
+        {"code": "WB", "name": "West Bengal"}
+    ]
     
     return jsonify({'states': states}), 200

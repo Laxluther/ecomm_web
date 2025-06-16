@@ -3,6 +3,7 @@ import uuid
 from PIL import Image, ImageOps
 from werkzeug.utils import secure_filename
 from flask import current_app
+from .image_utils import get_base_url
 
 class FileService:
     def __init__(self):
@@ -45,7 +46,7 @@ class FileService:
         upload_folder = current_app.config['UPLOAD_FOLDER']
         folders = [
             os.path.join(upload_folder, folder_type),
-            os.path.join(upload_folder, folder_type, 'thumbnails'),
+            os.path.join(upload_folder, folder_type, 'thumbnail'),
             os.path.join(upload_folder, folder_type, 'small'),
             os.path.join(upload_folder, folder_type, 'medium'),
             os.path.join(upload_folder, folder_type, 'large'),
@@ -70,6 +71,7 @@ class FileService:
     def create_variants(self, original_path, folder_type='products'):
         base_name = os.path.splitext(os.path.basename(original_path))[0]
         upload_folder = current_app.config['UPLOAD_FOLDER']
+        base_url = get_base_url()
         variants = {}
         
         with Image.open(original_path) as img:
@@ -92,7 +94,8 @@ class FileService:
                 
                 variant_path = os.path.join(upload_folder, folder_type, size_name, f"{base_name}.jpg")
                 variant_img.save(variant_path, 'JPEG', optimize=True, quality=85)
-                variants[size_name] = f"/static/uploads/{folder_type}/{size_name}/{base_name}.jpg"
+                # Generate absolute URL
+                variants[size_name] = f"{base_url}/static/uploads/{folder_type}/{size_name}/{base_name}.jpg"
         
         return variants
     
@@ -111,15 +114,18 @@ class FileService:
         file.save(original_path)
         self.optimize_image(original_path)
         
+        base_url = get_base_url()
         variants = {}
         if create_variants:
             variants = self.create_variants(original_path, folder_type)
         
-        main_url = variants.get('medium', f"/static/uploads/{folder_type}/original/{filename}")
+        # Generate absolute URLs
+        main_url = variants.get('medium', f"{base_url}/static/uploads/{folder_type}/original/{filename}")
+        original_url = f"{base_url}/static/uploads/{folder_type}/original/{filename}"
         
         return {
             'main_url': main_url,
-            'original_url': f"/static/uploads/{folder_type}/original/{filename}",
+            'original_url': original_url,
             'variants': variants,
             'filename': filename
         }, "Image uploaded successfully"
@@ -130,21 +136,32 @@ class FileService:
         
         upload_folder = current_app.config['UPLOAD_FOLDER']
         
-        if image_url.startswith('/static/uploads/'):
+        # Handle both relative and absolute URLs
+        if image_url.startswith('http'):
+            # Extract relative path from absolute URL
+            path_start = image_url.find('/static/uploads/')
+            if path_start != -1:
+                relative_path = image_url[path_start + len('/static/uploads/'):]
+            else:
+                return
+        elif image_url.startswith('/static/uploads/'):
             relative_path = image_url.replace('/static/uploads/', '')
-            path_parts = relative_path.split('/')
+        else:
+            return
+        
+        path_parts = relative_path.split('/')
+        
+        if len(path_parts) >= 2:
+            filename = path_parts[-1]
+            base_name = os.path.splitext(filename)[0]
             
-            if len(path_parts) >= 2:
-                filename = path_parts[-1]
-                base_name = os.path.splitext(filename)[0]
+            for size_name in self.image_sizes.keys():
+                if size_name == 'original':
+                    variant_path = os.path.join(upload_folder, folder_type, 'original', filename)
+                else:
+                    variant_path = os.path.join(upload_folder, folder_type, size_name, f"{base_name}.jpg")
                 
-                for size_name in self.image_sizes.keys():
-                    if size_name == 'original':
-                        variant_path = os.path.join(upload_folder, folder_type, 'original', filename)
-                    else:
-                        variant_path = os.path.join(upload_folder, folder_type, size_name, f"{base_name}.jpg")
-                    
-                    if os.path.exists(variant_path):
-                        os.remove(variant_path)
+                if os.path.exists(variant_path):
+                    os.remove(variant_path)
 
 file_service = FileService()
