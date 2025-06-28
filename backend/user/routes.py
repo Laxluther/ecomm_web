@@ -148,7 +148,7 @@ def get_current_user(user_id):
 def get_products():
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
-    category_id = request.args.get('category_id')
+    category_id = request.args.get('category_id')  # ✅ This is correct now
     search_query = request.args.get('search', '').strip()
     
     offset = (page - 1) * per_page
@@ -182,6 +182,7 @@ def get_products():
         query += " AND (p.product_name LIKE %s OR p.description LIKE %s)"
         params.extend([f'%{search_query}%', f'%{search_query}%'])
     
+    # ✅ FIX THIS LINE - it was truncated to "LIMIT %s OF"
     query += " ORDER BY p.created_at DESC LIMIT %s OFFSET %s"
     params.extend([per_page, offset])
     

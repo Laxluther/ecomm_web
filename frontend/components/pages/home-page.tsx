@@ -44,53 +44,66 @@ export function HomePage() {
       {/* Hero Slider */}
       <HeroSlider />
 
-      {/* Categories */}
       <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Shop by Category</h2>
-            <p className="text-xl text-gray-600">Explore our premium natural products</p>
-          </div>
+  <div className="container mx-auto px-4">
+    <div className="text-center mb-12">
+      <h2 className="text-3xl font-bold text-gray-900 mb-4">Shop by Category</h2>
+      <p className="text-xl text-gray-600">Explore our premium natural products</p>
+    </div>
 
-          {categoriesLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[...Array(4)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
+    {categoriesLoading ? (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} className="animate-pulse">
+            <CardContent className="p-6 text-center">
+              <div className="w-16 h-16 bg-gray-200 rounded-full mx-auto mb-4"></div>
+              <div className="h-4 bg-gray-200 rounded mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    ) : (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Safe rendering with proper checks */}
+        {categories && Array.isArray(categories) && categories.length > 0 ? (
+          categories.map((category: any) => {
+            const IconComponent = getCategoryIcon(category.category_name)
+            return (
+              <Link key={category.category_id} href={`/shop?category=${category.category_id}`}>
+                <Card className="text-center hover:shadow-lg transition-shadow cursor-pointer h-full">
                   <CardContent className="p-6">
-                    <div className="w-full h-32 bg-gray-200 rounded mb-4"></div>
-                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <IconComponent className="w-8 h-8 text-green-600" />
+                    </div>
+                    <h3 className="font-semibold text-gray-900 mb-2">
+                      {category.category_name}
+                    </h3>
+                    {category.description && (
+                      <p className="text-sm text-gray-600">
+                        {category.description}
+                      </p>
+                    )}
+                    {category.product_count && (
+                      <Badge variant="secondary" className="mt-2">
+                        {category.product_count} products
+                      </Badge>
+                    )}
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {categories?.map((category: any) => {
-                const IconComponent = getCategoryIcon(category.category_name)
-                return (
-                  <Link key={category.category_id} href={`/shop?category=${category.category_id}`}>
-                    <Card className="hover:shadow-lg transition-all duration-300 cursor-pointer group border-2 hover:border-emerald-200">
-                      <CardContent className="p-6 text-center">
-                        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-emerald-200 transition-colors">
-                          <IconComponent className="h-8 w-8 text-emerald-600" />
-                        </div>
-                        <h3 className="font-semibold text-lg mb-2 group-hover:text-emerald-700 transition-colors">
-                          {category.category_name}
-                        </h3>
-                        <p className="text-gray-600 text-sm mb-3">{category.description}</p>
-                        <Badge variant="secondary" className="bg-emerald-50 text-emerald-700">
-                          {category.product_count} products
-                        </Badge>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      </section>
+              </Link>
+            )
+          })
+        ) : (
+          // Fallback when no categories are available
+          <div className="col-span-full text-center py-8">
+            <p className="text-gray-600">No categories available at the moment.</p>
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+</section>
 
       {/* Features */}
       <section className="py-16 bg-emerald-50">

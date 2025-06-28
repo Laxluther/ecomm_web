@@ -34,7 +34,7 @@ export default function ShopPage() {
     queryKey: ["products", filters],
     queryFn: async () => {
       const params: any = {}
-      if (filters.category) params.category = filters.category
+      if (filters.category) params.category_id = filters.category  // ✅ Changed 'category' to 'category_id'
       if (filters.search) params.search = filters.search
       params.page = filters.page
       params.per_page = filters.perPage
@@ -208,7 +208,7 @@ export default function ShopPage() {
                 <h1 className="text-2xl font-bold text-gray-900">
                   {filters.category && categories.length > 0
                     ? categories.find((c: any) => c.category_id.toString() === filters.category)?.category_name ||
-                      "Products"
+                    "Products"
                     : "All Products"}
                 </h1>
                 {products.length > 0 && (

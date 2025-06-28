@@ -148,7 +148,7 @@ export const productsAPI = {
     return response.data
   },
 
-  getAll: async (params?: { category?: string; search?: string; page?: number; per_page?: number }) => {
+  getAll: async (params?: { category_id?: string; search?: string; page?: number; per_page?: number }) => {
     const queryString = params ? new URLSearchParams(params as any).toString() : ""
     const response = await api.get(`/products${queryString ? `?${queryString}` : ""}`)
     return response.data

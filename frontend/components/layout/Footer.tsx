@@ -9,16 +9,16 @@ export function Footer() {
           {/* Company Info */}
           <div>
             <div className="flex items-center space-x-2 mb-4">
-              <span className="font-bold text-xl">NATURAL STORE</span>
+              <span className="font-bold text-xl">WellNest</span>
             </div>
             <p className="text-gray-400 mb-4">
               Premium quality natural products including honey, coffee, nuts and seeds sourced directly from farmers.
             </p>
-            <div className="flex space-x-4">
+            {/* <div className="flex space-x-4">
               <Facebook className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer" />
               <Twitter className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer" />
               <Instagram className="h-5 w-5 text-gray-400 hover:text-white cursor-pointer" />
-            </div>
+            </div> */}
           </div>
 
           {/* Quick Links */}
@@ -52,11 +52,11 @@ export function Footer() {
           <div>
             <h3 className="font-semibold text-lg mb-4">Support</h3>
             <ul className="space-y-2">
-              <li>
+              {/* <li>
                 <Link href="/contact" className="text-gray-400 hover:text-white">
                   Contact Us
                 </Link>
-              </li>
+              </li> */}
               <li>
                 <Link href="/shipping" className="text-gray-400 hover:text-white">
                   Shipping & Returns
@@ -81,15 +81,15 @@ export function Footer() {
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <Phone className="h-4 w-4 text-amber-600" />
-                <span className="text-gray-400">+91 98765 43210</span>
+                <span className="text-gray-400">+91 6261116108</span>
               </div>
               <div className="flex items-center space-x-3">
                 <Mail className="h-4 w-4 text-amber-600" />
-                <span className="text-gray-400">info@naturalstore.com</span>
+                <span className="text-gray-400">info@wellnest.com</span>
               </div>
               <div className="flex items-center space-x-3">
                 <MapPin className="h-4 w-4 text-amber-600" />
-                <span className="text-gray-400">Mumbai, India</span>
+                <span className="text-gray-400">Bangloare, India</span>
               </div>
             </div>
           </div>
