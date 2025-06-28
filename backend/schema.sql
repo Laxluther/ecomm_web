@@ -467,3 +467,18 @@ INSERT INTO wallet (user_id, balance, created_at) VALUES
 ('user-001', 150.00, NOW()),
 ('user-002', 75.00, NOW());
 
+-- 1. Add the missing columns
+ALTER TABLE users 
+ADD COLUMN referral_code VARCHAR(20) UNIQUE NULL AFTER phone,
+ADD COLUMN referred_by VARCHAR(36) NULL AFTER referral_code,
+ADD INDEX idx_referral_code (referral_code);
+
+-- 2. Populate existing users with referral codes
+UPDATE users u 
+JOIN referral_codes rc ON u.user_id = rc.user_id 
+SET u.referral_code = rc.code 
+WHERE rc.status = 'active';
+
+UPDATE users 
+SET referral_code = CONCAT('REF', UPPER(SUBSTRING(MD5(RAND()), 1, 8)))
+WHERE referral_code IS NULL;

@@ -34,10 +34,12 @@ def public_featured_products():
 @shared_bp.route('/public/categories', methods=['GET'])
 def public_categories():
     categories = execute_query("""
-        SELECT category_id, category_name, description, image_url
-        FROM categories 
-        WHERE status = 'active' 
-        ORDER BY sort_order, category_name
+        SELECT c.category_id, c.category_name, c.description, c.image_url,
+               (SELECT COUNT(*) FROM products p 
+                WHERE p.category_id = c.category_id AND p.status = 'active') as product_count
+        FROM categories c
+        WHERE c.status = 'active' 
+        ORDER BY c.sort_order, c.category_name
     """, fetch_all=True)
     
     # Convert image URLs to absolute URLs

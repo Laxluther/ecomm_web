@@ -163,7 +163,7 @@ export const productsAPI = {
 // Categories
 export const categoriesAPI = {
   getAll: async () => {
-    const response = await api.get("/categories")
+    const response = await publicApi.get("/public/categories")  
     return response.data
   },
 }
