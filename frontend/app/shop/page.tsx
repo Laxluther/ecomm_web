@@ -34,7 +34,7 @@ export default function ShopPage() {
     queryKey: ["products", filters],
     queryFn: async () => {
       const params: any = {}
-      if (filters.category) params.category_id = filters.category  // ✅ Changed 'category' to 'category_id'
+      if (filters.category) params.category_id = filters.category  
       if (filters.search) params.search = filters.search
       params.page = filters.page
       params.per_page = filters.perPage
