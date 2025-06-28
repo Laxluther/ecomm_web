@@ -9,23 +9,23 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { ArrowRight, Truck, Shield, Headphones, Gift, Leaf, Coffee, Nut, Wheat } from "lucide-react"
-import api from "@/lib/api"
+import { productsAPI, categoriesAPI } from "@/lib/api"
 import { HeroSlider } from "@/components/home/hero-slider"
 
 export function HomePage() {
   const { data: featuredProducts, isLoading: featuredLoading } = useQuery({
     queryKey: ["featured-products"],
     queryFn: async () => {
-      const response = await api.get("/products/featured")
-      return response.data.products
+      const response = await productsAPI.getFeatured()
+      return response.products
     },
   })
 
   const { data: categories, isLoading: categoriesLoading } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
-      const response = await api.get("/categories")
-      return response.data.categories
+      const response = await categoriesAPI.getAll()
+return response.categories
     },
   })
 
