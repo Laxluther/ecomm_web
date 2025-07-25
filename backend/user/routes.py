@@ -149,19 +149,22 @@ def get_products():
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
     category_id = request.args.get('category_id')
+    search_query = request.args.get('search', '').strip()
+    sort_by = request.args.get('sort_by', 'created_at')  # ADD THIS LINE
+    
     if category_id:
         try:
             category_id = int(category_id)
         except (ValueError, TypeError):
             category_id = None  
-    search_query = request.args.get('search', '').strip()
     
     offset = (page - 1) * per_page
     
-    cache_key = f'user_products_{page}_{per_page}_{category_id}_{search_query}'
+    # CHANGE THIS LINE - add sort_by to cache key
+    cache_key = f'user_products_{page}_{per_page}_{category_id}_{search_query}_{sort_by}'
     cached_data = current_app.cache.get(cache_key)
     if cached_data:
-        return jsonify({'products': cached_data, 'cached': True}), 200
+        return jsonify(cached_data), 200  # CHANGE: return cached_data directly
     
     query = """
         SELECT p.product_id, p.product_name, p.description, p.price, 
@@ -187,8 +190,39 @@ def get_products():
         query += " AND (p.product_name LIKE %s OR p.description LIKE %s)"
         params.extend([f'%{search_query}%', f'%{search_query}%'])
     
-   
-    query += " ORDER BY p.created_at DESC LIMIT %s OFFSET %s"
+    # ADD THIS ENTIRE SECTION FOR SORTING
+    sort_mapping = {
+        'name': 'p.product_name ASC',
+        'price_low': 'p.discount_price ASC, p.price ASC',
+        'price_high': 'p.discount_price DESC, p.price DESC',
+        'newest': 'p.created_at DESC',
+        'created_at': 'p.created_at DESC'
+    }
+    
+    order_clause = sort_mapping.get(sort_by, 'p.created_at DESC')
+    query += f" ORDER BY {order_clause}"
+    
+    # ADD THIS SECTION FOR TOTAL COUNT
+    count_query = """
+        SELECT COUNT(*) as total
+        FROM products p 
+        LEFT JOIN categories c ON p.category_id = c.category_id
+        WHERE p.status = 'active' AND c.status = 'active'
+    """
+    
+    count_params = []
+    if category_id:
+        count_query += " AND p.category_id = %s"
+        count_params.append(category_id)
+    
+    if search_query:
+        count_query += " AND (p.product_name LIKE %s OR p.description LIKE %s)"
+        count_params.extend([f'%{search_query}%', f'%{search_query}%'])
+    
+    total_count = execute_query(count_query, count_params, fetch_one=True)['total']
+    
+    # KEEP THIS EXISTING SECTION BUT MODIFY THE RETURN
+    query += " LIMIT %s OFFSET %s"
     params.extend([per_page, offset])
     
     products = execute_query(query, params, fetch_all=True)
@@ -199,14 +233,27 @@ def get_products():
             product['savings'] = round(float(product['price']) - float(product['discount_price']), 2)
         else:
             product['savings'] = 0
+        
+        if product.get('primary_image'):
+            product['primary_image'] = convert_image_url(product['primary_image'])
     
-
-    products = convert_products_images(products)
+    # REPLACE YOUR EXISTING RETURN WITH THIS
+    response_data = {
+        'products': products,
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total': total_count,
+            'pages': (total_count + per_page - 1) // per_page,
+            'has_next': page < ((total_count + per_page - 1) // per_page),
+            'has_prev': page > 1
+        },
+        'cached': False
+    }
     
-    result_data = {'products': products, 'cached': False}
-    current_app.cache.set(cache_key, result_data, timeout=300)
+    current_app.cache.set(cache_key, response_data, timeout=300)
     
-    return jsonify(result_data), 200
+    return jsonify(response_data), 200
 
 @user_bp.route('/products/featured', methods=['GET'])
 def get_featured_products():

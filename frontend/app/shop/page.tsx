@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams,useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { ProductGrid } from "@/components/product/product-grid"
@@ -18,10 +18,11 @@ import { productsAPI, categoriesAPI } from "@/lib/api"
 
 export default function ShopPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [filters, setFilters] = useState({
     category: searchParams.get("category") || "",
     search: searchParams.get("search") || "",
-    sortBy: "name",
+    sortBy: searchParams.get("sort") || "created_at",
     page: 1,
     perPage: 12,
   })
@@ -31,13 +32,16 @@ export default function ShopPage() {
     isLoading: productsLoading,
     error: productsError,
   } = useQuery({
-    queryKey: ["products", filters],
-    queryFn: async () => {
-      const params: any = {}
-      if (filters.category) params.category_id = filters.category  
-      if (filters.search) params.search = filters.search
-      params.page = filters.page
-      params.per_page = filters.perPage
+    queryKey: ["products", filters.category, filters.search, filters.sortBy, filters.page, filters.perPage],
+queryFn: async () => {
+  const params: any = {
+    page: filters.page,
+    per_page: filters.perPage,
+    sort_by: filters.sortBy,  // CHANGED from sortBy to sort_by
+  }
+  
+  if (filters.category) params.category_id = filters.category
+  if (filters.search) params.search = filters.search
 
       const response = await productsAPI.getAll(params)
       return response
@@ -64,12 +68,21 @@ export default function ShopPage() {
     setFilters({
       category: "",
       search: "",
-      sortBy: "name",
+      sortBy: "created_at",
       page: 1,
       perPage: 12,
     })
   }
-
+  useEffect(() => {
+    const params = new URLSearchParams()
+    if (filters.category) params.set("category", filters.category)
+    if (filters.search) params.set("search", filters.search)
+    if (filters.sortBy !== "created_at") params.set("sort", filters.sortBy)
+    if (filters.page > 1) params.set("page", filters.page.toString())
+    
+    const newUrl = `/shop${params.toString() ? `?${params.toString()}` : ""}`
+    router.replace(newUrl, { scroll: false })
+  }, [filters, router])
   const activeFiltersCount = [filters.category, filters.search].filter(Boolean).length
 
   // Safe data extraction
@@ -190,10 +203,10 @@ export default function ShopPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="name">Name</SelectItem>
-                      <SelectItem value="price_low">Price: Low to High</SelectItem>
-                      <SelectItem value="price_high">Price: High to Low</SelectItem>
-                      <SelectItem value="newest">Newest First</SelectItem>
+                    <SelectItem value="created_at">Newest First</SelectItem>
+<SelectItem value="name">Name</SelectItem>
+<SelectItem value="price_low">Price: Low to High</SelectItem>
+<SelectItem value="price_high">Price: High to Low</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

@@ -148,11 +148,27 @@ export const productsAPI = {
     return response.data
   },
 
-  getAll: async (params?: { category_id?: string; search?: string; page?: number; per_page?: number }) => {
-    const queryString = params ? new URLSearchParams(params as any).toString() : ""
-    const response = await api.get(`/products${queryString ? `?${queryString}` : ""}`)
-    return response.data
-  },
+  
+// NEW:
+getAll: async (params?: { 
+  category_id?: string; 
+  search?: string; 
+  page?: number; 
+  per_page?: number;
+  sort_by?: string;  // ADD THIS LINE
+}) => {
+  const cleanParams: Record<string, string> = {}
+  
+  if (params?.category_id) cleanParams.category_id = params.category_id
+  if (params?.search?.trim()) cleanParams.search = params.search.trim()
+  if (params?.page && params.page > 1) cleanParams.page = params.page.toString()
+  if (params?.per_page) cleanParams.per_page = params.per_page.toString()
+  if (params?.sort_by) cleanParams.sort_by = params.sort_by  // ADD THIS LINE
+  
+  const queryString = new URLSearchParams(cleanParams).toString()
+  const response = await api.get(`/products${queryString ? `?${queryString}` : ""}`)
+  return response.data
+},
 
   getById: async (id: string) => {
     const response = await api.get(`/products/${id}`)
