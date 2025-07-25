@@ -20,8 +20,161 @@ import { Badge } from "@/components/ui/badge"
 import { useCartStore } from "@/lib/store"
 import { useAuth } from "@/lib/auth"
 import { CreditCard, Wallet, Truck, Plus, MapPin, Home, Building, Edit } from "lucide-react"
-import api from "@/lib/api" // Using api directly like profile page
+import api from "@/lib/api"
 import toast from "react-hot-toast"
+
+// AddressForm component outside to prevent recreation and focus loss
+interface AddressFormProps {
+  isEdit?: boolean
+  onSubmit: (e: React.FormEvent) => void
+  isLoading?: boolean
+  formData: any
+  onFormChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
+  onTypeChange: (value: string) => void
+  onDefaultChange: (checked: boolean) => void
+  onCancel: () => void
+}
+
+const AddressForm: React.FC<AddressFormProps> = ({
+  isEdit = false,
+  onSubmit,
+  isLoading = false,
+  formData,
+  onFormChange,
+  onTypeChange,
+  onDefaultChange,
+  onCancel
+}) => (
+  <form onSubmit={onSubmit} className="space-y-4">
+    <div>
+      <Label htmlFor="type">Address Type</Label>
+      <Select value={formData.type} onValueChange={onTypeChange}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="home">Home</SelectItem>
+          <SelectItem value="work">Work</SelectItem>
+          <SelectItem value="other">Other</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="name">Full Name *</Label>
+        <Input
+          id="name"
+          name="name"
+          value={formData.name}
+          onChange={onFormChange}
+          required
+          autoComplete="name"
+        />
+      </div>
+      <div>
+        <Label htmlFor="phone">Phone Number *</Label>
+        <Input
+          id="phone"
+          name="phone"
+          type="tel"
+          value={formData.phone}
+          onChange={onFormChange}
+          required
+          autoComplete="tel"
+        />
+      </div>
+    </div>
+
+    <div>
+      <Label htmlFor="address_line_1">Address Line 1 *</Label>
+      <Textarea
+        id="address_line_1"
+        name="address_line_1"
+        value={formData.address_line_1}
+        onChange={onFormChange}
+        required
+        autoComplete="address-line1"
+      />
+    </div>
+
+    <div>
+      <Label htmlFor="address_line_2">Address Line 2 (Optional)</Label>
+      <Input
+        id="address_line_2"
+        name="address_line_2"
+        value={formData.address_line_2}
+        onChange={onFormChange}
+        autoComplete="address-line2"
+      />
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div>
+        <Label htmlFor="city">City *</Label>
+        <Input
+          id="city"
+          name="city"
+          value={formData.city}
+          onChange={onFormChange}
+          required
+          autoComplete="address-level2"
+        />
+      </div>
+      <div>
+        <Label htmlFor="pincode">Pincode *</Label>
+        <Input
+          id="pincode"
+          name="pincode"
+          value={formData.pincode}
+          onChange={onFormChange}
+          required
+          autoComplete="postal-code"
+        />
+      </div>
+    </div>
+
+    <div>
+      <Label htmlFor="state">State *</Label>
+      <Input
+        id="state"
+        name="state"
+        value={formData.state}
+        onChange={onFormChange}
+        required
+        autoComplete="address-level1"
+      />
+    </div>
+
+    <div>
+      <Label htmlFor="landmark">Landmark (Optional)</Label>
+      <Input
+        id="landmark"
+        name="landmark"
+        value={formData.landmark}
+        onChange={onFormChange}
+      />
+    </div>
+
+    <div className="flex items-center space-x-2">
+      <Checkbox
+        id="is_default"
+        checked={formData.is_default}
+        onCheckedChange={onDefaultChange}
+      />
+      <Label htmlFor="is_default">Set as default address</Label>
+    </div>
+
+    <div className="flex justify-end space-x-2 pt-4">
+      <Button type="button" variant="outline" onClick={onCancel}>
+        Cancel
+      </Button>
+      <Button type="submit" disabled={isLoading}>
+        {isLoading ? "Saving..." : (isEdit ? "Update Address" : "Add Address")}
+      </Button>
+    </div>
+  </form>
+)
 
 interface Address {
   address_id: number
@@ -67,7 +220,7 @@ export default function CheckoutPage() {
   const shipping = subtotal >= 500 ? 0 : 50
   const total = subtotal + shipping
 
-  // Fetch saved addresses - Using same pattern as profile page
+  // Fetch saved addresses
   const { 
     data: addressesData, 
     isLoading: addressesLoading, 
@@ -76,42 +229,23 @@ export default function CheckoutPage() {
   } = useQuery({
     queryKey: ["addresses"],
     queryFn: async () => {
-      console.log("🔄 Fetching addresses in checkout...")
       const response = await api.get("/addresses")
-      console.log("✅ Addresses API Response:", response.data)
-      console.log("📊 Addresses Array:", response.data?.addresses)
-      console.log("📈 Addresses Count:", response.data?.addresses?.length || 0)
       return response.data
     },
     enabled: isAuthenticated,
     retry: 3,
-    staleTime: 0, // Don't use stale data
-    refetchOnMount: true, // Always refetch when component mounts
-    refetchOnWindowFocus: false, // Don't refetch on window focus
+    staleTime: 0,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
   })
-
-  // Debug logging
-  useEffect(() => {
-    console.log("🔍 Checkout Debug Info:")
-    console.log("- isAuthenticated:", isAuthenticated)
-    console.log("- addressesLoading:", addressesLoading)
-    console.log("- addressesError:", addressesError)
-    console.log("- addressesData:", addressesData)
-    console.log("- addresses array:", addressesData?.addresses)
-    console.log("- addresses length:", addressesData?.addresses?.length)
-    console.log("- selectedAddressId:", selectedAddressId)
-  }, [isAuthenticated, addressesLoading, addressesError, addressesData, selectedAddressId])
 
   // Add Address Mutation
   const addAddressMutation = useMutation({
     mutationFn: async (addressData: any) => {
-      console.log("➕ Adding new address:", addressData)
       const response = await api.post("/addresses", addressData)
-      console.log("✅ Add address response:", response.data)
       return response.data
     },
     onSuccess: async () => {
-      console.log("🎉 Address added successfully, refetching...")
       toast.success("Address added successfully!")
       setIsAddressDialogOpen(false)
       
@@ -131,12 +265,8 @@ export default function CheckoutPage() {
       
       // Force refetch
       await queryClient.invalidateQueries({ queryKey: ["addresses"] })
-      setTimeout(() => {
-        refetchAddresses()
-      }, 100)
     },
     onError: (error: any) => {
-      console.error("❌ Add address error:", error)
       toast.error(error.response?.data?.message || "Failed to add address")
     },
   })
@@ -144,45 +274,29 @@ export default function CheckoutPage() {
   // Update Address Mutation
   const updateAddressMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      console.log("✏️ Updating address:", id, data)
       const response = await api.put(`/addresses/${id}`, data)
-      console.log("✅ Update address response:", response.data)
       return response.data
     },
     onSuccess: async () => {
-      console.log("🎉 Address updated successfully, refetching...")
       toast.success("Address updated successfully!")
       setIsEditDialogOpen(false)
       setEditingAddress(null)
       
       // Force refetch
       await queryClient.invalidateQueries({ queryKey: ["addresses"] })
-      setTimeout(() => {
-        refetchAddresses()
-      }, 100)
     },
     onError: (error: any) => {
-      console.error("❌ Update address error:", error)
       toast.error(error.response?.data?.message || "Failed to update address")
     },
   })
 
   // Set default address when addresses are loaded
   useEffect(() => {
-    console.log("🎯 Setting default address...")
-    console.log("- addressesData:", addressesData)
-    console.log("- addresses:", addressesData?.addresses)
-    console.log("- currentSelected:", selectedAddressId)
-    
     if (addressesData?.addresses?.length > 0 && !selectedAddressId) {
       const defaultAddress = addressesData.addresses.find((addr: Address) => addr.is_default)
-      console.log("- defaultAddress found:", defaultAddress)
-      
       if (defaultAddress) {
-        console.log("✅ Setting default address:", defaultAddress.address_id)
         setSelectedAddressId(defaultAddress.address_id)
       } else {
-        console.log("✅ Setting first address:", addressesData.addresses[0].address_id)
         setSelectedAddressId(addressesData.addresses[0].address_id)
       }
     }
@@ -191,6 +305,23 @@ export default function CheckoutPage() {
   const handleNewAddressChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
     setNewAddressData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleTypeChange = (value: string) => {
+    setNewAddressData(prev => ({ ...prev, type: value }))
+  }
+
+  const handleDefaultChange = (checked: boolean) => {
+    setNewAddressData(prev => ({ ...prev, is_default: checked }))
+  }
+
+  const handleCancelAdd = () => {
+    setIsAddressDialogOpen(false)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditDialogOpen(false)
+    setEditingAddress(null)
   }
 
   const handleAddNewAddress = async (e: React.FormEvent) => {
@@ -208,7 +339,6 @@ export default function CheckoutPage() {
   }
 
   const handleEditAddress = (address: Address) => {
-    console.log("✏️ Editing address:", address)
     setEditingAddress(address)
     setNewAddressData({
       type: address.type,
@@ -297,166 +427,6 @@ export default function CheckoutPage() {
     }
   }
 
-  // Force refresh addresses button for debugging
-  const handleRefreshAddresses = () => {
-    console.log("🔄 Manually refreshing addresses...")
-    queryClient.invalidateQueries({ queryKey: ["addresses"] })
-    refetchAddresses()
-  }
-
-  // Address form component
-  const AddressForm = ({ 
-    isEdit = false, 
-    onSubmit, 
-    isLoading = false 
-  }: { 
-    isEdit?: boolean; 
-    onSubmit: (e: React.FormEvent) => void;
-    isLoading?: boolean;
-  }) => (
-    <form onSubmit={onSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="type">Address Type</Label>
-        <Select 
-          value={newAddressData.type} 
-          onValueChange={(value) => setNewAddressData(prev => ({ ...prev, type: value }))}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="home">Home</SelectItem>
-            <SelectItem value="work">Work</SelectItem>
-            <SelectItem value="other">Other</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="name">Full Name *</Label>
-          <Input
-            id="name"
-            name="name"
-            value={newAddressData.name}
-            onChange={handleNewAddressChange}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="phone">Phone Number *</Label>
-          <Input
-            id="phone"
-            name="phone"
-            type="tel"
-            value={newAddressData.phone}
-            onChange={handleNewAddressChange}
-            required
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="address_line_1">Address Line 1 *</Label>
-        <Textarea
-          id="address_line_1"
-          name="address_line_1"
-          value={newAddressData.address_line_1}
-          onChange={handleNewAddressChange}
-          required
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="address_line_2">Address Line 2 (Optional)</Label>
-        <Input
-          id="address_line_2"
-          name="address_line_2"
-          value={newAddressData.address_line_2}
-          onChange={handleNewAddressChange}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="city">City *</Label>
-          <Input
-            id="city"
-            name="city"
-            value={newAddressData.city}
-            onChange={handleNewAddressChange}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor="pincode">Pincode *</Label>
-          <Input
-            id="pincode"
-            name="pincode"
-            value={newAddressData.pincode}
-            onChange={handleNewAddressChange}
-            required
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="state">State *</Label>
-        <Input
-          id="state"
-          name="state"
-          value={newAddressData.state}
-          onChange={handleNewAddressChange}
-          required
-        />
-      </div>
-
-      <div>
-        <Label htmlFor="landmark">Landmark (Optional)</Label>
-        <Input
-          id="landmark"
-          name="landmark"
-          value={newAddressData.landmark}
-          onChange={handleNewAddressChange}
-        />
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <Checkbox
-          id="is_default"
-          checked={newAddressData.is_default}
-          onCheckedChange={(checked) => 
-            setNewAddressData(prev => ({ ...prev, is_default: !!checked }))
-          }
-        />
-        <Label htmlFor="is_default">Set as default address</Label>
-      </div>
-
-      <div className="flex justify-end space-x-2 pt-4">
-        <Button 
-          type="button" 
-          variant="outline" 
-          onClick={() => {
-            if (isEdit) {
-              setIsEditDialogOpen(false)
-              setEditingAddress(null)
-            } else {
-              setIsAddressDialogOpen(false)
-            }
-          }}
-        >
-          Cancel
-        </Button>
-        <Button 
-          type="submit" 
-          disabled={isLoading}
-        >
-          {isLoading ? "Saving..." : (isEdit ? "Update Address" : "Add Address")}
-        </Button>
-      </div>
-    </form>
-  )
-
   if (!isAuthenticated) {
     router.push("/login")
     return null
@@ -472,38 +442,12 @@ export default function CheckoutPage() {
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
-          {/* Debug button - remove in production */}
-          <Button 
-            onClick={handleRefreshAddresses}
-            variant="outline"
-            size="sm"
-            className="bg-red-50 border-red-200 text-red-600"
-          >
-            🔄 Debug: Refresh Addresses
-          </Button>
-        </div>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
 
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Checkout Form */}
             <div className="lg:col-span-2 space-y-6">
-              
-              {/* Debug Info Card */}
-              <Card className="bg-yellow-50 border-yellow-200">
-                <CardHeader>
-                  <CardTitle className="text-yellow-800">🐛 Debug Info (Remove in Production)</CardTitle>
-                </CardHeader>
-                <CardContent className="text-sm text-yellow-700">
-                  <p>Authentication: {isAuthenticated ? "✅ Logged in" : "❌ Not logged in"}</p>
-                  <p>Addresses Loading: {addressesLoading ? "⏳ Loading..." : "✅ Done"}</p>
-                  <p>Addresses Error: {addressesError ? `❌ ${addressesError}` : "✅ No errors"}</p>
-                  <p>Addresses Data: {addressesData ? "✅ Received" : "❌ None"}</p>
-                  <p>Addresses Array: {addressesData?.addresses ? `✅ ${addressesData.addresses.length} addresses` : "❌ Empty"}</p>
-                  <p>Selected Address ID: {selectedAddressId || "None"}</p>
-                </CardContent>
-              </Card>
               
               {/* Delivery Address Section */}
               <Card>
@@ -524,9 +468,14 @@ export default function CheckoutPage() {
                         <DialogHeader>
                           <DialogTitle>Add New Address</DialogTitle>
                         </DialogHeader>
-                        <AddressForm 
-                          onSubmit={handleAddNewAddress} 
+                        <AddressForm
+                          onSubmit={handleAddNewAddress}
                           isLoading={addAddressMutation.isPending}
+                          formData={newAddressData}
+                          onFormChange={handleNewAddressChange}
+                          onTypeChange={handleTypeChange}
+                          onDefaultChange={handleDefaultChange}
+                          onCancel={handleCancelAdd}
                         />
                       </DialogContent>
                     </Dialog>
@@ -540,8 +489,8 @@ export default function CheckoutPage() {
                     </div>
                   ) : addressesError ? (
                     <div className="text-center py-8">
-                      <p className="text-red-500">Error loading addresses: {addressesError.message}</p>
-                      <Button onClick={handleRefreshAddresses} className="mt-2">Retry</Button>
+                      <p className="text-red-500">Error loading addresses. Please try again.</p>
+                      <Button onClick={() => refetchAddresses()} className="mt-2">Retry</Button>
                     </div>
                   ) : !addressesData?.addresses?.length ? (
                     <div className="text-center py-8">
@@ -606,10 +555,15 @@ export default function CheckoutPage() {
                   <DialogHeader>
                     <DialogTitle>Edit Address</DialogTitle>
                   </DialogHeader>
-                  <AddressForm 
+                  <AddressForm
                     isEdit={true}
-                    onSubmit={handleUpdateAddress} 
+                    onSubmit={handleUpdateAddress}
                     isLoading={updateAddressMutation.isPending}
+                    formData={newAddressData}
+                    onFormChange={handleNewAddressChange}
+                    onTypeChange={handleTypeChange}
+                    onDefaultChange={handleDefaultChange}
+                    onCancel={handleCancelEdit}
                   />
                 </DialogContent>
               </Dialog>
