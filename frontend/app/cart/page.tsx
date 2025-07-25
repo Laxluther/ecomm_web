@@ -37,7 +37,7 @@ export default function CartPage() {
 
   const handleUpdateQuantity = async (productId: number, newQuantity: number) => {
     try {
-      await api.put("/user/cart/update", {
+      await api.put("/cart/update", {
         product_id: productId,
         quantity: newQuantity,
       })
@@ -50,7 +50,7 @@ export default function CartPage() {
 
   const handleRemoveItem = async (productId: number) => {
     try {
-      await api.delete(`/user/cart/remove/${productId}`)
+      await api.delete(`/cart/remove/${productId}`)
       removeItem(productId)
       toast.success("Item removed from cart")
       refetch()

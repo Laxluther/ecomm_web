@@ -421,7 +421,134 @@ def remove_from_cart(user_id, product_id):
     """, (user_id, product_id))
     
     return APIResponse.success(None, 'Item removed from cart')
+# Address Routes
+@user_bp.route('/addresses', methods=['GET'])
+@user_token_required
+def get_addresses(user_id):
+    addresses = execute_query("""
+        SELECT address_id, address_type as type, full_name as name, phone,
+               address_line1 as address_line_1, address_line2 as address_line_2,
+               city, state, postal_code as pincode, landmark, is_default
+        FROM addresses 
+        WHERE user_id = %s 
+        ORDER BY is_default DESC, created_at DESC
+    """, (user_id,), fetch_all=True)
+    
+    return jsonify({'addresses': addresses}), 200
 
+@user_bp.route('/addresses', methods=['POST'])
+@user_token_required
+def add_address(user_id):
+    data = request.get_json()
+    
+    required_fields = ['name', 'phone', 'address_line_1', 'city', 'state', 'pincode']
+    if not all(field in data for field in required_fields):
+        return APIResponse.error('Missing required fields', 400)
+    
+    address_type = data.get('type', 'home')
+    name = data['name'].strip()
+    phone = data['phone'].strip()
+    address_line_1 = data['address_line_1'].strip()
+    address_line_2 = data.get('address_line_2', '').strip()
+    city = data['city'].strip()
+    state = data['state'].strip()
+    pincode = data['pincode'].strip()
+    landmark = data.get('landmark', '').strip()
+    is_default = data.get('is_default', False)
+    
+    # If this is set as default, unset other defaults
+    if is_default:
+        execute_query("""
+            UPDATE addresses SET is_default = FALSE WHERE user_id = %s
+        """, (user_id,))
+    
+    # If no default exists, make this the default
+    existing_addresses = execute_query("""
+        SELECT COUNT(*) as count FROM addresses WHERE user_id = %s
+    """, (user_id,), fetch_one=True)
+    
+    if existing_addresses['count'] == 0:
+        is_default = True
+    
+    execute_query("""
+        INSERT INTO addresses (
+            user_id, address_type, full_name, phone, address_line1, 
+            address_line2, city, state, postal_code, landmark, is_default, created_at
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (user_id, address_type, name, phone, address_line_1, address_line_2, 
+          city, state, pincode, landmark, is_default, datetime.now()))
+    
+    return APIResponse.success(None, 'Address added successfully', 201)
+
+@user_bp.route('/addresses/<int:address_id>', methods=['PUT'])
+@user_token_required
+def update_address(user_id, address_id):
+    data = request.get_json()
+    
+    # Check if address belongs to user
+    address = execute_query("""
+        SELECT address_id FROM addresses WHERE address_id = %s AND user_id = %s
+    """, (address_id, user_id), fetch_one=True)
+    
+    if not address:
+        return APIResponse.error('Address not found', 404)
+    
+    address_type = data.get('type', 'home')
+    name = data.get('name', '').strip()
+    phone = data.get('phone', '').strip()
+    address_line_1 = data.get('address_line_1', '').strip()
+    address_line_2 = data.get('address_line_2', '').strip()
+    city = data.get('city', '').strip()
+    state = data.get('state', '').strip()
+    pincode = data.get('pincode', '').strip()
+    landmark = data.get('landmark', '').strip()
+    is_default = data.get('is_default', False)
+    
+    # If this is set as default, unset other defaults
+    if is_default:
+        execute_query("""
+            UPDATE addresses SET is_default = FALSE WHERE user_id = %s AND address_id != %s
+        """, (user_id, address_id))
+    
+    execute_query("""
+        UPDATE addresses SET 
+            address_type = %s, full_name = %s, phone = %s, address_line1 = %s,
+            address_line2 = %s, city = %s, state = %s, postal_code = %s,
+            landmark = %s, is_default = %s, updated_at = %s
+        WHERE address_id = %s AND user_id = %s
+    """, (address_type, name, phone, address_line_1, address_line_2, city, 
+          state, pincode, landmark, is_default, datetime.now(), address_id, user_id))
+    
+    return APIResponse.success(None, 'Address updated successfully')
+
+@user_bp.route('/addresses/<int:address_id>', methods=['DELETE'])
+@user_token_required
+def delete_address(user_id, address_id):
+    # Check if address belongs to user
+    address = execute_query("""
+        SELECT address_id, is_default FROM addresses WHERE address_id = %s AND user_id = %s
+    """, (address_id, user_id), fetch_one=True)
+    
+    if not address:
+        return APIResponse.error('Address not found', 404)
+    
+    # Delete the address
+    execute_query("""
+        DELETE FROM addresses WHERE address_id = %s AND user_id = %s
+    """, (address_id, user_id))
+    
+    # If deleted address was default, make another one default
+    if address['is_default']:
+        remaining_address = execute_query("""
+            SELECT address_id FROM addresses WHERE user_id = %s LIMIT 1
+        """, (user_id,), fetch_one=True)
+        
+        if remaining_address:
+            execute_query("""
+                UPDATE addresses SET is_default = TRUE WHERE address_id = %s
+            """, (remaining_address['address_id'],))
+    
+    return APIResponse.success(None, 'Address deleted successfully')
 # Wishlist Routes
 @user_bp.route('/wishlist', methods=['GET'])
 @user_token_required
@@ -556,3 +683,6 @@ def get_wallet(user_id):
         'wallet': wallet,
         'transactions': transactions
     }), 200
+    
+
+

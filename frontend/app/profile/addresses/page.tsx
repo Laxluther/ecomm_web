@@ -58,7 +58,7 @@ export default function AddressesPage() {
   const { data: addressesData, isLoading } = useQuery({
     queryKey: ["addresses"],
     queryFn: async () => {
-      const response = await api.get("/user/addresses")
+      const response = await api.get("/addresses")
       return response.data
     },
     enabled: isAuthenticated,
@@ -66,7 +66,7 @@ export default function AddressesPage() {
 
   const addAddressMutation = useMutation({
     mutationFn: async (addressData: any) => {
-      const response = await api.post("/user/addresses", addressData)
+      const response = await api.post("/addresses", addressData)
       return response.data
     },
     onSuccess: () => {
@@ -82,7 +82,7 @@ export default function AddressesPage() {
 
   const updateAddressMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const response = await api.put(`/user/addresses/${id}`, data)
+      const response = await api.put(`/addresses/${id}`, data)
       return response.data
     },
     onSuccess: () => {
@@ -99,7 +99,7 @@ export default function AddressesPage() {
 
   const deleteAddressMutation = useMutation({
     mutationFn: async (addressId: number) => {
-      const response = await api.delete(`/user/addresses/${addressId}`)
+      const response = await api.delete(`/addresses/${addressId}`)
       return response.data
     },
     onSuccess: () => {

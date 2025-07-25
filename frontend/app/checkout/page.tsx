@@ -95,11 +95,11 @@ export default function CheckoutPage() {
   const handleAddNewAddress = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      const response = await api.post("/user/addresses", newAddressData)
+      const response = await api.post("/addresses", newAddressData)
       toast.success("Address added successfully!")
       setIsAddressDialogOpen(false)
       // Refresh addresses and select the new one
-      window.location.reload()
+      router.refresh()
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to add address")
     }
