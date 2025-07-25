@@ -148,7 +148,12 @@ def get_current_user(user_id):
 def get_products():
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
-    category_id = request.args.get('category_id')  # ✅ This is correct now
+    category_id = request.args.get('category_id')
+    if category_id:
+        try:
+            category_id = int(category_id)
+        except (ValueError, TypeError):
+            category_id = None  
     search_query = request.args.get('search', '').strip()
     
     offset = (page - 1) * per_page
