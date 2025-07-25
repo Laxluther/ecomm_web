@@ -191,6 +191,8 @@ export const cartAPI = {
   },
 }
 
+// Updated section for lib/api.ts - Addresses API
+
 // Addresses
 export const addressesAPI = {
   getAll: async () => {
@@ -199,12 +201,44 @@ export const addressesAPI = {
   },
 
   add: async (addressData: any) => {
-    const response = await api.post("/addresses", addressData)
+    // Map frontend field names to backend expected field names
+    const mappedData = {
+      type: addressData.type || "home",
+      name: addressData.name,
+      phone: addressData.phone,
+      address_line_1: addressData.address_line_1,
+      address_line_2: addressData.address_line_2 || "",
+      city: addressData.city,
+      state: addressData.state,
+      pincode: addressData.pincode,
+      landmark: addressData.landmark || "",
+      is_default: addressData.is_default || false,
+    }
+    
+    console.log("Sending address data:", mappedData) // Debug log
+    
+    const response = await api.post("/addresses", mappedData)
     return response.data
   },
 
   update: async (id: number, addressData: any) => {
-    const response = await api.put(`/addresses/${id}`, addressData)
+    // Map frontend field names to backend expected field names
+    const mappedData = {
+      type: addressData.type || "home",
+      name: addressData.name,
+      phone: addressData.phone,
+      address_line_1: addressData.address_line_1,
+      address_line_2: addressData.address_line_2 || "",
+      city: addressData.city,
+      state: addressData.state,
+      pincode: addressData.pincode,
+      landmark: addressData.landmark || "",
+      is_default: addressData.is_default || false,
+    }
+    
+    console.log("Updating address data:", mappedData) // Debug log
+    
+    const response = await api.put(`/addresses/${id}`, mappedData)
     return response.data
   },
 

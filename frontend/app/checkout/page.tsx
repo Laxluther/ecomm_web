@@ -1,12 +1,9 @@
-// Complete replacement for frontend/app/checkout/page.tsx
-
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
@@ -23,9 +20,8 @@ import { Badge } from "@/components/ui/badge"
 import { useCartStore } from "@/lib/store"
 import { useAuth } from "@/lib/auth"
 import { CreditCard, Wallet, Truck, Plus, MapPin, Home, Building, Edit } from "lucide-react"
-import api from "@/lib/api"
+import api from "@/lib/api" // Using api directly like profile page
 import toast from "react-hot-toast"
-import { addressesAPI } from "@/lib/api"
 
 interface Address {
   address_id: number
@@ -49,6 +45,8 @@ export default function CheckoutPage() {
 
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [editingAddress, setEditingAddress] = useState<Address | null>(null)
   const [paymentMethod, setPaymentMethod] = useState("cod")
   const [isLoading, setIsLoading] = useState(false)
 
@@ -69,46 +67,55 @@ export default function CheckoutPage() {
   const shipping = subtotal >= 500 ? 0 : 50
   const total = subtotal + shipping
 
-  // Fetch saved addresses
-  const { data: addressesData } = useQuery({
+  // Fetch saved addresses - Using same pattern as profile page
+  const { 
+    data: addressesData, 
+    isLoading: addressesLoading, 
+    error: addressesError,
+    refetch: refetchAddresses 
+  } = useQuery({
     queryKey: ["addresses"],
     queryFn: async () => {
-      const response = await addressesAPI.getAll()
+      console.log("🔄 Fetching addresses in checkout...")
+      const response = await api.get("/addresses")
+      console.log("✅ Addresses API Response:", response.data)
+      console.log("📊 Addresses Array:", response.data?.addresses)
+      console.log("📈 Addresses Count:", response.data?.addresses?.length || 0)
       return response.data
     },
     enabled: isAuthenticated,
+    retry: 3,
+    staleTime: 0, // Don't use stale data
+    refetchOnMount: true, // Always refetch when component mounts
+    refetchOnWindowFocus: false, // Don't refetch on window focus
   })
 
-  // Set default address when addresses are loaded
+  // Debug logging
   useEffect(() => {
-    if (addressesData?.addresses?.length > 0 && !selectedAddressId) {
-      const defaultAddress = addressesData.addresses.find((addr: Address) => addr.is_default)
-      if (defaultAddress) {
-        setSelectedAddressId(defaultAddress.address_id)
-      } else {
-        setSelectedAddressId(addressesData.addresses[0].address_id)
-      }
-    }
-  }, [addressesData, selectedAddressId])
+    console.log("🔍 Checkout Debug Info:")
+    console.log("- isAuthenticated:", isAuthenticated)
+    console.log("- addressesLoading:", addressesLoading)
+    console.log("- addressesError:", addressesError)
+    console.log("- addressesData:", addressesData)
+    console.log("- addresses array:", addressesData?.addresses)
+    console.log("- addresses length:", addressesData?.addresses?.length)
+    console.log("- selectedAddressId:", selectedAddressId)
+  }, [isAuthenticated, addressesLoading, addressesError, addressesData, selectedAddressId])
 
-  const handleNewAddressChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setNewAddressData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleAddNewAddress = async (e: React.FormEvent) => {
-    e.preventDefault()
-    e.stopPropagation() // ✅ Prevent bubbling to parent form
-    
-    try {
-      const response = await api.post("/addresses", newAddressData)
+  // Add Address Mutation
+  const addAddressMutation = useMutation({
+    mutationFn: async (addressData: any) => {
+      console.log("➕ Adding new address:", addressData)
+      const response = await api.post("/addresses", addressData)
+      console.log("✅ Add address response:", response.data)
+      return response.data
+    },
+    onSuccess: async () => {
+      console.log("🎉 Address added successfully, refetching...")
       toast.success("Address added successfully!")
       setIsAddressDialogOpen(false)
       
-      // ✅ Properly refresh addresses using React Query
-      await queryClient.invalidateQueries({ queryKey: ["addresses"] })
-      
-      // ✅ Reset form
+      // Reset form
       setNewAddressData({
         type: "home",
         name: "",
@@ -122,17 +129,125 @@ export default function CheckoutPage() {
         is_default: false,
       })
       
-    } catch (error: any) {
+      // Force refetch
+      await queryClient.invalidateQueries({ queryKey: ["addresses"] })
+      setTimeout(() => {
+        refetchAddresses()
+      }, 100)
+    },
+    onError: (error: any) => {
+      console.error("❌ Add address error:", error)
       toast.error(error.response?.data?.message || "Failed to add address")
+    },
+  })
+
+  // Update Address Mutation
+  const updateAddressMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      console.log("✏️ Updating address:", id, data)
+      const response = await api.put(`/addresses/${id}`, data)
+      console.log("✅ Update address response:", response.data)
+      return response.data
+    },
+    onSuccess: async () => {
+      console.log("🎉 Address updated successfully, refetching...")
+      toast.success("Address updated successfully!")
+      setIsEditDialogOpen(false)
+      setEditingAddress(null)
+      
+      // Force refetch
+      await queryClient.invalidateQueries({ queryKey: ["addresses"] })
+      setTimeout(() => {
+        refetchAddresses()
+      }, 100)
+    },
+    onError: (error: any) => {
+      console.error("❌ Update address error:", error)
+      toast.error(error.response?.data?.message || "Failed to update address")
+    },
+  })
+
+  // Set default address when addresses are loaded
+  useEffect(() => {
+    console.log("🎯 Setting default address...")
+    console.log("- addressesData:", addressesData)
+    console.log("- addresses:", addressesData?.addresses)
+    console.log("- currentSelected:", selectedAddressId)
+    
+    if (addressesData?.addresses?.length > 0 && !selectedAddressId) {
+      const defaultAddress = addressesData.addresses.find((addr: Address) => addr.is_default)
+      console.log("- defaultAddress found:", defaultAddress)
+      
+      if (defaultAddress) {
+        console.log("✅ Setting default address:", defaultAddress.address_id)
+        setSelectedAddressId(defaultAddress.address_id)
+      } else {
+        console.log("✅ Setting first address:", addressesData.addresses[0].address_id)
+        setSelectedAddressId(addressesData.addresses[0].address_id)
+      }
     }
+  }, [addressesData, selectedAddressId])
+
+  const handleNewAddressChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target
+    setNewAddressData((prev) => ({ ...prev, [name]: value }))
   }
 
-  // ✅ NEW: Handle payment method selection with alert for online payments
+  const handleAddNewAddress = async (e: React.FormEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    // Validate required fields
+    if (!newAddressData.name || !newAddressData.phone || !newAddressData.address_line_1 || 
+        !newAddressData.city || !newAddressData.state || !newAddressData.pincode) {
+      toast.error("Please fill in all required fields")
+      return
+    }
+    
+    addAddressMutation.mutate(newAddressData)
+  }
+
+  const handleEditAddress = (address: Address) => {
+    console.log("✏️ Editing address:", address)
+    setEditingAddress(address)
+    setNewAddressData({
+      type: address.type,
+      name: address.name,
+      phone: address.phone,
+      address_line_1: address.address_line_1,
+      address_line_2: address.address_line_2 || "",
+      city: address.city,
+      state: address.state,
+      pincode: address.pincode,
+      landmark: address.landmark || "",
+      is_default: address.is_default,
+    })
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdateAddress = async (e: React.FormEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (!editingAddress) return
+    
+    // Validate required fields
+    if (!newAddressData.name || !newAddressData.phone || !newAddressData.address_line_1 || 
+        !newAddressData.city || !newAddressData.state || !newAddressData.pincode) {
+      toast.error("Please fill in all required fields")
+      return
+    }
+    
+    updateAddressMutation.mutate({
+      id: editingAddress.address_id,
+      data: newAddressData
+    })
+  }
+
   const handlePaymentMethodChange = (method: string) => {
     if (method === "online") {
-      // ✅ Alert for online payment
       alert("🚧 Online Payment Coming Soon!\n\nWe're working on integrating secure online payment options. For now, please use Cash on Delivery (COD).\n\nThank you for your patience! 🙏")
-      return // Don't change the payment method
+      return
     }
     setPaymentMethod(method)
   }
@@ -175,12 +290,172 @@ export default function CheckoutPage() {
     switch (type) {
       case "home":
         return <Home className="h-4 w-4" />
-      case "office":
+      case "work":
         return <Building className="h-4 w-4" />
       default:
         return <MapPin className="h-4 w-4" />
     }
   }
+
+  // Force refresh addresses button for debugging
+  const handleRefreshAddresses = () => {
+    console.log("🔄 Manually refreshing addresses...")
+    queryClient.invalidateQueries({ queryKey: ["addresses"] })
+    refetchAddresses()
+  }
+
+  // Address form component
+  const AddressForm = ({ 
+    isEdit = false, 
+    onSubmit, 
+    isLoading = false 
+  }: { 
+    isEdit?: boolean; 
+    onSubmit: (e: React.FormEvent) => void;
+    isLoading?: boolean;
+  }) => (
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div>
+        <Label htmlFor="type">Address Type</Label>
+        <Select 
+          value={newAddressData.type} 
+          onValueChange={(value) => setNewAddressData(prev => ({ ...prev, type: value }))}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="home">Home</SelectItem>
+            <SelectItem value="work">Work</SelectItem>
+            <SelectItem value="other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="name">Full Name *</Label>
+          <Input
+            id="name"
+            name="name"
+            value={newAddressData.name}
+            onChange={handleNewAddressChange}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="phone">Phone Number *</Label>
+          <Input
+            id="phone"
+            name="phone"
+            type="tel"
+            value={newAddressData.phone}
+            onChange={handleNewAddressChange}
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="address_line_1">Address Line 1 *</Label>
+        <Textarea
+          id="address_line_1"
+          name="address_line_1"
+          value={newAddressData.address_line_1}
+          onChange={handleNewAddressChange}
+          required
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="address_line_2">Address Line 2 (Optional)</Label>
+        <Input
+          id="address_line_2"
+          name="address_line_2"
+          value={newAddressData.address_line_2}
+          onChange={handleNewAddressChange}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="city">City *</Label>
+          <Input
+            id="city"
+            name="city"
+            value={newAddressData.city}
+            onChange={handleNewAddressChange}
+            required
+          />
+        </div>
+        <div>
+          <Label htmlFor="pincode">Pincode *</Label>
+          <Input
+            id="pincode"
+            name="pincode"
+            value={newAddressData.pincode}
+            onChange={handleNewAddressChange}
+            required
+          />
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor="state">State *</Label>
+        <Input
+          id="state"
+          name="state"
+          value={newAddressData.state}
+          onChange={handleNewAddressChange}
+          required
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="landmark">Landmark (Optional)</Label>
+        <Input
+          id="landmark"
+          name="landmark"
+          value={newAddressData.landmark}
+          onChange={handleNewAddressChange}
+        />
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="is_default"
+          checked={newAddressData.is_default}
+          onCheckedChange={(checked) => 
+            setNewAddressData(prev => ({ ...prev, is_default: !!checked }))
+          }
+        />
+        <Label htmlFor="is_default">Set as default address</Label>
+      </div>
+
+      <div className="flex justify-end space-x-2 pt-4">
+        <Button 
+          type="button" 
+          variant="outline" 
+          onClick={() => {
+            if (isEdit) {
+              setIsEditDialogOpen(false)
+              setEditingAddress(null)
+            } else {
+              setIsAddressDialogOpen(false)
+            }
+          }}
+        >
+          Cancel
+        </Button>
+        <Button 
+          type="submit" 
+          disabled={isLoading}
+        >
+          {isLoading ? "Saving..." : (isEdit ? "Update Address" : "Add Address")}
+        </Button>
+      </div>
+    </form>
+  )
 
   if (!isAuthenticated) {
     router.push("/login")
@@ -197,14 +472,40 @@ export default function CheckoutPage() {
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Checkout</h1>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Checkout</h1>
+          {/* Debug button - remove in production */}
+          <Button 
+            onClick={handleRefreshAddresses}
+            variant="outline"
+            size="sm"
+            className="bg-red-50 border-red-200 text-red-600"
+          >
+            🔄 Debug: Refresh Addresses
+          </Button>
+        </div>
 
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Checkout Form */}
             <div className="lg:col-span-2 space-y-6">
               
-              {/* ✅ Delivery Address Section */}
+              {/* Debug Info Card */}
+              <Card className="bg-yellow-50 border-yellow-200">
+                <CardHeader>
+                  <CardTitle className="text-yellow-800">🐛 Debug Info (Remove in Production)</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm text-yellow-700">
+                  <p>Authentication: {isAuthenticated ? "✅ Logged in" : "❌ Not logged in"}</p>
+                  <p>Addresses Loading: {addressesLoading ? "⏳ Loading..." : "✅ Done"}</p>
+                  <p>Addresses Error: {addressesError ? `❌ ${addressesError}` : "✅ No errors"}</p>
+                  <p>Addresses Data: {addressesData ? "✅ Received" : "❌ None"}</p>
+                  <p>Addresses Array: {addressesData?.addresses ? `✅ ${addressesData.addresses.length} addresses` : "❌ Empty"}</p>
+                  <p>Selected Address ID: {selectedAddressId || "None"}</p>
+                </CardContent>
+              </Card>
+              
+              {/* Delivery Address Section */}
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -223,156 +524,26 @@ export default function CheckoutPage() {
                         <DialogHeader>
                           <DialogTitle>Add New Address</DialogTitle>
                         </DialogHeader>
-                        <form onSubmit={handleAddNewAddress} className="space-y-4">
-                          <div>
-                            <Label htmlFor="type">Address Type</Label>
-                            <Select
-                              value={newAddressData.type}
-                              onValueChange={(value) => setNewAddressData(prev => ({ ...prev, type: value }))}
-                            >
-                              <SelectTrigger>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="home">Home</SelectItem>
-                                <SelectItem value="office">Office</SelectItem>
-                                <SelectItem value="other">Other</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor="name">Full Name</Label>
-                              <Input
-                                id="name"
-                                name="name"
-                                value={newAddressData.name}
-                                onChange={handleNewAddressChange}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="phone">Phone</Label>
-                              <Input
-                                id="phone"
-                                name="phone"
-                                type="tel"
-                                value={newAddressData.phone}
-                                onChange={handleNewAddressChange}
-                                required
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <Label htmlFor="address_line_1">Address Line 1</Label>
-                            <Textarea
-                              id="address_line_1"
-                              name="address_line_1"
-                              value={newAddressData.address_line_1}
-                              onChange={handleNewAddressChange}
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <Label htmlFor="address_line_2">Address Line 2 (Optional)</Label>
-                            <Input
-                              id="address_line_2"
-                              name="address_line_2"
-                              value={newAddressData.address_line_2}
-                              onChange={handleNewAddressChange}
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor="city">City</Label>
-                              <Input
-                                id="city"
-                                name="city"
-                                value={newAddressData.city}
-                                onChange={handleNewAddressChange}
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="pincode">Pincode</Label>
-                              <Input
-                                id="pincode"
-                                name="pincode"
-                                value={newAddressData.pincode}
-                                onChange={handleNewAddressChange}
-                                required
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <Label htmlFor="state">State</Label>
-                            <Input
-                              id="state"
-                              name="state"
-                              value={newAddressData.state}
-                              onChange={handleNewAddressChange}
-                              required
-                            />
-                          </div>
-
-                          <div>
-                            <Label htmlFor="landmark">Landmark (Optional)</Label>
-                            <Input
-                              id="landmark"
-                              name="landmark"
-                              value={newAddressData.landmark}
-                              onChange={handleNewAddressChange}
-                            />
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="is_default"
-                              checked={newAddressData.is_default}
-                              onCheckedChange={(checked) => 
-                                setNewAddressData(prev => ({ ...prev, is_default: !!checked }))
-                              }
-                            />
-                            <Label htmlFor="is_default">Set as default address</Label>
-                          </div>
-
-                          <div className="flex space-x-3 pt-4">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              className="flex-1"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                setIsAddressDialogOpen(false)
-                              }}
-                            >
-                              Cancel
-                            </Button>
-                            <Button 
-                              type="submit" 
-                              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                              onClick={(e) => {
-                                // The form will handle the submission via onSubmit
-                                e.stopPropagation()
-                              }}
-                            >
-                              Add Address
-                            </Button>
-                          </div>
-                        </form>
+                        <AddressForm 
+                          onSubmit={handleAddNewAddress} 
+                          isLoading={addAddressMutation.isPending}
+                        />
                       </DialogContent>
                     </Dialog>
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Show all addresses with radio buttons */}
-                  {addressesData?.addresses?.length === 0 ? (
+                  {addressesLoading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto"></div>
+                      <p className="text-gray-500 mt-2">Loading addresses...</p>
+                    </div>
+                  ) : addressesError ? (
+                    <div className="text-center py-8">
+                      <p className="text-red-500">Error loading addresses: {addressesError.message}</p>
+                      <Button onClick={handleRefreshAddresses} className="mt-2">Retry</Button>
+                    </div>
+                  ) : !addressesData?.addresses?.length ? (
                     <div className="text-center py-8">
                       <MapPin className="h-12 w-12 text-gray-300 mx-auto mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 mb-2">No addresses saved</h3>
@@ -384,7 +555,7 @@ export default function CheckoutPage() {
                       onValueChange={(value) => setSelectedAddressId(Number.parseInt(value))}
                       className="space-y-3"
                     >
-                      {addressesData?.addresses?.map((address: Address) => (
+                      {addressesData.addresses.map((address: Address) => (
                         <div
                           key={address.address_id}
                           className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-gray-50"
@@ -417,7 +588,7 @@ export default function CheckoutPage() {
                             onClick={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
-                              toast.info("Edit functionality coming soon!")
+                              handleEditAddress(address)
                             }}
                           >
                             <Edit className="h-4 w-4" />
@@ -429,7 +600,21 @@ export default function CheckoutPage() {
                 </CardContent>
               </Card>
 
-              {/* ✅ Payment Method Section */}
+              {/* Edit Address Dialog */}
+              <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Edit Address</DialogTitle>
+                  </DialogHeader>
+                  <AddressForm 
+                    isEdit={true}
+                    onSubmit={handleUpdateAddress} 
+                    isLoading={updateAddressMutation.isPending}
+                  />
+                </DialogContent>
+              </Dialog>
+
+              {/* Payment Method */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -438,106 +623,69 @@ export default function CheckoutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <RadioGroup value={paymentMethod} onValueChange={handlePaymentMethodChange} className="space-y-3">
-                    {/* Cash on Delivery */}
-                    <div className="flex items-center space-x-3 p-4 border rounded-lg">
+                  <RadioGroup value={paymentMethod} onValueChange={handlePaymentMethodChange}>
+                    <div className="flex items-center space-x-2">
                       <RadioGroupItem value="cod" id="cod" />
-                      <Label htmlFor="cod" className="flex items-center space-x-3 cursor-pointer flex-1">
-                        <Wallet className="h-5 w-5 text-green-600" />
-                        <div>
-                          <p className="font-medium">Cash on Delivery</p>
-                          <p className="text-sm text-gray-500">Pay when your order arrives</p>
-                        </div>
+                      <Label htmlFor="cod" className="flex items-center gap-2 cursor-pointer">
+                        <Wallet className="h-4 w-4" />
+                        Cash on Delivery
                       </Label>
-                      <Badge variant="secondary" className="bg-green-100 text-green-800">Available</Badge>
                     </div>
-
-                    {/* Online Payment - with alert */}
-                    <div className="flex items-center space-x-3 p-4 border rounded-lg opacity-75 cursor-pointer" 
-                         onClick={(e) => {
-                           e.preventDefault()
-                           e.stopPropagation()
-                           handlePaymentMethodChange("online")
-                         }}>
-                      <RadioGroupItem value="online" id="online" disabled />
-                      <Label htmlFor="online" className="flex items-center space-x-3 cursor-pointer flex-1">
-                        <CreditCard className="h-5 w-5 text-blue-600" />
-                        <div>
-                          <p className="font-medium">Online Payment</p>
-                          <p className="text-sm text-gray-500">UPI, Cards, Net Banking</p>
-                        </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="online" id="online" />
+                      <Label htmlFor="online" className="flex items-center gap-2 cursor-pointer">
+                        <CreditCard className="h-4 w-4" />
+                        Online Payment
+                        <Badge variant="secondary" className="text-xs">Coming Soon</Badge>
                       </Label>
-                      <Badge variant="outline" className="bg-orange-100 text-orange-800">Coming Soon</Badge>
                     </div>
                   </RadioGroup>
-
-                  {paymentMethod === "cod" && (
-                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
-                      <p className="text-sm text-green-800">
-                        ✅ Cash on Delivery selected. Pay ₹{total.toFixed(2)} when your order arrives.
-                      </p>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             </div>
 
-            {/* Order Summary Sidebar */}
-            <div className="space-y-6">
-              <Card>
+            {/* Order Summary */}
+            <div className="lg:col-span-1">
+              <Card className="sticky top-4">
                 <CardHeader>
                   <CardTitle>Order Summary</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Order Items */}
-                  <div className="space-y-3">
-                    {items.map((item) => (
-                      <div key={item.product_id} className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center">
-                          <span className="text-xs font-medium">{item.quantity}x</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{item.product_name}</p>
-                          <p className="text-sm text-gray-500">₹{item.price} each</p>
-                        </div>
-                        <p className="text-sm font-medium">₹{(item.price * item.quantity).toFixed(2)}</p>
-                      </div>
-                    ))}
-                  </div>
-
+                  {items.map((item) => (
+                    <div key={item.product_id} className="flex justify-between text-sm">
+                      <span>{item.name} × {item.quantity}</span>
+                      <span>₹{(item.price * item.quantity).toFixed(2)}</span>
+                    </div>
+                  ))}
+                  
                   <Separator />
-
-                  {/* Price Breakdown */}
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
+                  
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
                       <span>Subtotal</span>
                       <span>₹{subtotal.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between">
                       <span>Shipping</span>
                       <span>{shipping === 0 ? "Free" : `₹${shipping.toFixed(2)}`}</span>
                     </div>
-                    <Separator />
-                    <div className="flex justify-between font-semibold">
-                      <span>Total</span>
-                      <span>₹{total.toFixed(2)}</span>
-                    </div>
                   </div>
-
-                  {/* Place Order Button */}
-                  <Button
-                    type="submit"
-                    className="w-full bg-emerald-600 hover:bg-emerald-700"
+                  
+                  <Separator />
+                  
+                  <div className="flex justify-between font-semibold">
+                    <span>Total</span>
+                    <span>₹{total.toFixed(2)}</span>
+                  </div>
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    size="lg"
                     disabled={isLoading || !selectedAddressId}
                   >
-                    {isLoading ? "Placing Order..." : `Place Order - ₹${total.toFixed(2)}`}
+                    {isLoading ? "Placing Order..." : "Place Order"}
                   </Button>
-
-                  {subtotal < 500 && (
-                    <p className="text-xs text-center text-gray-500">
-                      Add ₹{(500 - subtotal).toFixed(2)} more for free delivery
-                    </p>
-                  )}
                 </CardContent>
               </Card>
             </div>
