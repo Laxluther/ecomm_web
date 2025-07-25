@@ -1,10 +1,12 @@
+// Complete replacement for frontend/app/checkout/page.tsx
+
 "use client"
 
 import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
@@ -17,12 +19,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
 import { useCartStore } from "@/lib/store"
 import { useAuth } from "@/lib/auth"
-import { CreditCard, Wallet, Truck, Plus, MapPin, Home, Building } from "lucide-react"
+import { CreditCard, Wallet, Truck, Plus, MapPin, Home, Building, Edit } from "lucide-react"
 import api from "@/lib/api"
 import toast from "react-hot-toast"
 import { addressesAPI } from "@/lib/api"
+
 interface Address {
   address_id: number
   type: string
@@ -41,9 +45,9 @@ export default function CheckoutPage() {
   const { items, getTotalPrice, clearCart } = useCartStore()
   const { isAuthenticated } = useAuth()
   const router = useRouter()
+  const queryClient = useQueryClient()
 
   const [selectedAddressId, setSelectedAddressId] = useState<number | null>(null)
-  const [useNewAddress, setUseNewAddress] = useState(false)
   const [isAddressDialogOpen, setIsAddressDialogOpen] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState("cod")
   const [isLoading, setIsLoading] = useState(false)
@@ -94,15 +98,43 @@ export default function CheckoutPage() {
 
   const handleAddNewAddress = async (e: React.FormEvent) => {
     e.preventDefault()
+    e.stopPropagation() // ✅ Prevent bubbling to parent form
+    
     try {
       const response = await api.post("/addresses", newAddressData)
       toast.success("Address added successfully!")
       setIsAddressDialogOpen(false)
-      // Refresh addresses and select the new one
-      router.refresh()
+      
+      // ✅ Properly refresh addresses using React Query
+      await queryClient.invalidateQueries({ queryKey: ["addresses"] })
+      
+      // ✅ Reset form
+      setNewAddressData({
+        type: "home",
+        name: "",
+        phone: "",
+        address_line_1: "",
+        address_line_2: "",
+        city: "",
+        state: "",
+        pincode: "",
+        landmark: "",
+        is_default: false,
+      })
+      
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to add address")
     }
+  }
+
+  // ✅ NEW: Handle payment method selection with alert for online payments
+  const handlePaymentMethodChange = (method: string) => {
+    if (method === "online") {
+      // ✅ Alert for online payment
+      alert("🚧 Online Payment Coming Soon!\n\nWe're working on integrating secure online payment options. For now, please use Cash on Delivery (COD).\n\nThank you for your patience! 🙏")
+      return // Don't change the payment method
+    }
+    setPaymentMethod(method)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -110,31 +142,19 @@ export default function CheckoutPage() {
     setIsLoading(true)
 
     try {
-      let shippingAddress
+      // Validate address selection
+      if (!selectedAddressId) {
+        toast.error("Please select a delivery address")
+        setIsLoading(false)
+        return
+      }
 
-      if (useNewAddress) {
-        // Validate new address
-        if (
-          !newAddressData.name ||
-          !newAddressData.phone ||
-          !newAddressData.address_line_1 ||
-          !newAddressData.city ||
-          !newAddressData.state ||
-          !newAddressData.pincode
-        ) {
-          toast.error("Please fill all required address fields")
-          setIsLoading(false)
-          return
-        }
-        shippingAddress = newAddressData
-      } else {
-        // Use selected saved address
-        if (!selectedAddressId) {
-          toast.error("Please select a delivery address")
-          setIsLoading(false)
-          return
-        }
-        shippingAddress = addressesData?.addresses?.find((addr: Address) => addr.address_id === selectedAddressId)
+      const selectedAddress = addressesData?.addresses?.find((addr: Address) => addr.address_id === selectedAddressId)
+      
+      if (!selectedAddress) {
+        toast.error("Selected address not found")
+        setIsLoading(false)
+        return
       }
 
       // Simulate order placement
@@ -183,315 +203,233 @@ export default function CheckoutPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Checkout Form */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Delivery Address */}
+              
+              {/* ✅ Delivery Address Section */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Truck className="h-5 w-5" />
-                    Delivery Address
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Address Selection Options */}
-                  <RadioGroup
-                    value={useNewAddress ? "new" : "saved"}
-                    onValueChange={(value) => setUseNewAddress(value === "new")}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="saved" id="saved" />
-                      <Label htmlFor="saved">Use saved address</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="new" id="new" />
-                      <Label htmlFor="new">Use new address</Label>
-                    </div>
-                  </RadioGroup>
-
-                  {/* Saved Addresses */}
-                  {!useNewAddress && (
-                    <div className="space-y-3">
-                      {addressesData?.addresses?.length === 0 ? (
-                        <div className="text-center py-6">
-                          <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-                          <p className="text-gray-600 mb-4">No saved addresses found</p>
-                          <Button type="button" variant="outline" onClick={() => setUseNewAddress(true)}>
-                            Add New Address
-                          </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-center justify-between">
-                            <Label>Select delivery address:</Label>
-                            <Dialog open={isAddressDialogOpen} onOpenChange={setIsAddressDialogOpen}>
-                              <DialogTrigger asChild>
-                                <Button type="button" variant="outline" size="sm">
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  Add New
-                                </Button>
-                              </DialogTrigger>
-                              <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                                <DialogHeader>
-                                  <DialogTitle>Add New Address</DialogTitle>
-                                </DialogHeader>
-                                <form onSubmit={handleAddNewAddress} className="space-y-4">
-                                  <div>
-                                    <Label htmlFor="type">Address Type</Label>
-                                    <Select
-                                      value={newAddressData.type}
-                                      onValueChange={(value) => setNewAddressData((prev) => ({ ...prev, type: value }))}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="home">Home</SelectItem>
-                                        <SelectItem value="office">Office</SelectItem>
-                                        <SelectItem value="other">Other</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-
-                                  <div>
-                                    <Label htmlFor="name">Full Name</Label>
-                                    <Input
-                                      id="name"
-                                      name="name"
-                                      value={newAddressData.name}
-                                      onChange={handleNewAddressChange}
-                                      required
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <Label htmlFor="phone">Phone Number</Label>
-                                    <Input
-                                      id="phone"
-                                      name="phone"
-                                      type="tel"
-                                      value={newAddressData.phone}
-                                      onChange={handleNewAddressChange}
-                                      required
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <Label htmlFor="address_line_1">Address Line 1</Label>
-                                    <Textarea
-                                      id="address_line_1"
-                                      name="address_line_1"
-                                      value={newAddressData.address_line_1}
-                                      onChange={handleNewAddressChange}
-                                      required
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <Label htmlFor="address_line_2">Address Line 2 (Optional)</Label>
-                                    <Input
-                                      id="address_line_2"
-                                      name="address_line_2"
-                                      value={newAddressData.address_line_2}
-                                      onChange={handleNewAddressChange}
-                                    />
-                                  </div>
-
-                                  <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                      <Label htmlFor="city">City</Label>
-                                      <Input
-                                        id="city"
-                                        name="city"
-                                        value={newAddressData.city}
-                                        onChange={handleNewAddressChange}
-                                        required
-                                      />
-                                    </div>
-                                    <div>
-                                      <Label htmlFor="pincode">Pincode</Label>
-                                      <Input
-                                        id="pincode"
-                                        name="pincode"
-                                        value={newAddressData.pincode}
-                                        onChange={handleNewAddressChange}
-                                        required
-                                      />
-                                    </div>
-                                  </div>
-
-                                  <div>
-                                    <Label htmlFor="state">State</Label>
-                                    <Input
-                                      id="state"
-                                      name="state"
-                                      value={newAddressData.state}
-                                      onChange={handleNewAddressChange}
-                                      required
-                                    />
-                                  </div>
-
-                                  <div>
-                                    <Label htmlFor="landmark">Landmark (Optional)</Label>
-                                    <Input
-                                      id="landmark"
-                                      name="landmark"
-                                      value={newAddressData.landmark}
-                                      onChange={handleNewAddressChange}
-                                    />
-                                  </div>
-
-                                  <div className="flex items-center space-x-2">
-                                    <Checkbox
-                                      id="is_default"
-                                      checked={newAddressData.is_default}
-                                      onCheckedChange={(checked) =>
-                                        setNewAddressData((prev) => ({ ...prev, is_default: checked as boolean }))
-                                      }
-                                    />
-                                    <Label htmlFor="is_default" className="text-sm">
-                                      Set as default address
-                                    </Label>
-                                  </div>
-
-                                  <div className="flex space-x-3 pt-4">
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      className="flex-1"
-                                      onClick={() => setIsAddressDialogOpen(false)}
-                                    >
-                                      Cancel
-                                    </Button>
-                                    <Button type="submit" className="flex-1 bg-emerald-600 hover:bg-emerald-700">
-                                      Add Address
-                                    </Button>
-                                  </div>
-                                </form>
-                              </DialogContent>
-                            </Dialog>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Truck className="h-5 w-5" />
+                      Delivery Address
+                    </CardTitle>
+                    <Dialog open={isAddressDialogOpen} onOpenChange={setIsAddressDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add New Address
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                          <DialogTitle>Add New Address</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleAddNewAddress} className="space-y-4">
+                          <div>
+                            <Label htmlFor="type">Address Type</Label>
+                            <Select
+                              value={newAddressData.type}
+                              onValueChange={(value) => setNewAddressData(prev => ({ ...prev, type: value }))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="home">Home</SelectItem>
+                                <SelectItem value="office">Office</SelectItem>
+                                <SelectItem value="other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
 
-                          <RadioGroup
-                            value={selectedAddressId?.toString()}
-                            onValueChange={(value) => setSelectedAddressId(Number.parseInt(value))}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="name">Full Name</Label>
+                              <Input
+                                id="name"
+                                name="name"
+                                value={newAddressData.name}
+                                onChange={handleNewAddressChange}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="phone">Phone</Label>
+                              <Input
+                                id="phone"
+                                name="phone"
+                                type="tel"
+                                value={newAddressData.phone}
+                                onChange={handleNewAddressChange}
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="address_line_1">Address Line 1</Label>
+                            <Textarea
+                              id="address_line_1"
+                              name="address_line_1"
+                              value={newAddressData.address_line_1}
+                              onChange={handleNewAddressChange}
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="address_line_2">Address Line 2 (Optional)</Label>
+                            <Input
+                              id="address_line_2"
+                              name="address_line_2"
+                              value={newAddressData.address_line_2}
+                              onChange={handleNewAddressChange}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="city">City</Label>
+                              <Input
+                                id="city"
+                                name="city"
+                                value={newAddressData.city}
+                                onChange={handleNewAddressChange}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="pincode">Pincode</Label>
+                              <Input
+                                id="pincode"
+                                name="pincode"
+                                value={newAddressData.pincode}
+                                onChange={handleNewAddressChange}
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="state">State</Label>
+                            <Input
+                              id="state"
+                              name="state"
+                              value={newAddressData.state}
+                              onChange={handleNewAddressChange}
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <Label htmlFor="landmark">Landmark (Optional)</Label>
+                            <Input
+                              id="landmark"
+                              name="landmark"
+                              value={newAddressData.landmark}
+                              onChange={handleNewAddressChange}
+                            />
+                          </div>
+
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="is_default"
+                              checked={newAddressData.is_default}
+                              onCheckedChange={(checked) => 
+                                setNewAddressData(prev => ({ ...prev, is_default: !!checked }))
+                              }
+                            />
+                            <Label htmlFor="is_default">Set as default address</Label>
+                          </div>
+
+                          <div className="flex space-x-3 pt-4">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="flex-1"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setIsAddressDialogOpen(false)
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              type="submit" 
+                              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                              onClick={(e) => {
+                                // The form will handle the submission via onSubmit
+                                e.stopPropagation()
+                              }}
+                            >
+                              Add Address
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {/* Show all addresses with radio buttons */}
+                  {addressesData?.addresses?.length === 0 ? (
+                    <div className="text-center py-8">
+                      <MapPin className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No addresses saved</h3>
+                      <p className="text-gray-500 mb-4">Add a delivery address to continue</p>
+                    </div>
+                  ) : (
+                    <RadioGroup
+                      value={selectedAddressId?.toString()}
+                      onValueChange={(value) => setSelectedAddressId(Number.parseInt(value))}
+                      className="space-y-3"
+                    >
+                      {addressesData?.addresses?.map((address: Address) => (
+                        <div
+                          key={address.address_id}
+                          className="flex items-start space-x-3 p-4 border rounded-lg hover:bg-gray-50"
+                        >
+                          <RadioGroupItem
+                            value={address.address_id.toString()}
+                            id={`address-${address.address_id}`}
+                            className="mt-1"
+                          />
+                          <Label htmlFor={`address-${address.address_id}`} className="flex-1 cursor-pointer">
+                            <div className="flex items-center space-x-2 mb-2">
+                              {getAddressIcon(address.type)}
+                              <span className="font-medium capitalize">{address.type}</span>
+                              {address.is_default && (
+                                <Badge variant="secondary" className="text-xs">Default</Badge>
+                              )}
+                            </div>
+                            <div className="text-sm text-gray-700">
+                              <p className="font-medium">{address.name} • {address.phone}</p>
+                              <p>{address.address_line_1}</p>
+                              {address.address_line_2 && <p>{address.address_line_2}</p>}
+                              <p>{address.city}, {address.state} {address.pincode}</p>
+                              {address.landmark && <p className="text-gray-500">Landmark: {address.landmark}</p>}
+                            </div>
+                          </Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              toast.info("Edit functionality coming soon!")
+                            }}
                           >
-                            {addressesData?.addresses?.map((address: Address) => (
-                              <div
-                                key={address.address_id}
-                                className="flex items-start space-x-3 p-4 border rounded-lg"
-                              >
-                                <RadioGroupItem
-                                  value={address.address_id.toString()}
-                                  id={`address-${address.address_id}`}
-                                  className="mt-1"
-                                />
-                                <Label htmlFor={`address-${address.address_id}`} className="flex-1 cursor-pointer">
-                                  <div className="flex items-center space-x-2 mb-2">
-                                    {getAddressIcon(address.type)}
-                                    <span className="font-medium capitalize">{address.type}</span>
-                                    {address.is_default && (
-                                      <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-1 rounded">
-                                        Default
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-sm text-gray-700">
-                                    <p className="font-medium">
-                                      {address.name} • {address.phone}
-                                    </p>
-                                    <p>{address.address_line_1}</p>
-                                    {address.address_line_2 && <p>{address.address_line_2}</p>}
-                                    <p>
-                                      {address.city}, {address.state} {address.pincode}
-                                    </p>
-                                    {address.landmark && <p className="text-gray-500">Landmark: {address.landmark}</p>}
-                                  </div>
-                                </Label>
-                              </div>
-                            ))}
-                          </RadioGroup>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* New Address Form */}
-                  {useNewAddress && (
-                    <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
-                      <h4 className="font-medium">Enter new delivery address:</h4>
-
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="new_name">Full Name</Label>
-                          <Input
-                            id="new_name"
-                            name="name"
-                            value={newAddressData.name}
-                            onChange={handleNewAddressChange}
-                            required
-                          />
+                            <Edit className="h-4 w-4" />
+                          </Button>
                         </div>
-                        <div>
-                          <Label htmlFor="new_phone">Phone</Label>
-                          <Input
-                            id="new_phone"
-                            name="phone"
-                            type="tel"
-                            value={newAddressData.phone}
-                            onChange={handleNewAddressChange}
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="new_address_line_1">Address</Label>
-                        <Textarea
-                          id="new_address_line_1"
-                          name="address_line_1"
-                          value={newAddressData.address_line_1}
-                          onChange={handleNewAddressChange}
-                          required
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <Label htmlFor="new_city">City</Label>
-                          <Input
-                            id="new_city"
-                            name="city"
-                            value={newAddressData.city}
-                            onChange={handleNewAddressChange}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="new_state">State</Label>
-                          <Input
-                            id="new_state"
-                            name="state"
-                            value={newAddressData.state}
-                            onChange={handleNewAddressChange}
-                            required
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="new_pincode">Pincode</Label>
-                          <Input
-                            id="new_pincode"
-                            name="pincode"
-                            value={newAddressData.pincode}
-                            onChange={handleNewAddressChange}
-                            required
-                          />
-                        </div>
-                      </div>
-                    </div>
+                      ))}
+                    </RadioGroup>
                   )}
                 </CardContent>
               </Card>
 
-              {/* Payment Method */}
+              {/* ✅ Payment Method Section */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -500,40 +438,53 @@ export default function CheckoutPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
-                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                  <RadioGroup value={paymentMethod} onValueChange={handlePaymentMethodChange} className="space-y-3">
+                    {/* Cash on Delivery */}
+                    <div className="flex items-center space-x-3 p-4 border rounded-lg">
                       <RadioGroupItem value="cod" id="cod" />
-                      <Label htmlFor="cod" className="flex-1 cursor-pointer">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Cash on Delivery</p>
-                            <p className="text-sm text-gray-500">Pay when you receive your order</p>
-                          </div>
-                          <Truck className="h-5 w-5 text-gray-400" />
+                      <Label htmlFor="cod" className="flex items-center space-x-3 cursor-pointer flex-1">
+                        <Wallet className="h-5 w-5 text-green-600" />
+                        <div>
+                          <p className="font-medium">Cash on Delivery</p>
+                          <p className="text-sm text-gray-500">Pay when your order arrives</p>
                         </div>
                       </Label>
+                      <Badge variant="secondary" className="bg-green-100 text-green-800">Available</Badge>
                     </div>
 
-                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
-                      <RadioGroupItem value="wallet" id="wallet" />
-                      <Label htmlFor="wallet" className="flex-1 cursor-pointer">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">Wallet Payment</p>
-                            <p className="text-sm text-gray-500">Pay using your wallet balance</p>
-                          </div>
-                          <Wallet className="h-5 w-5 text-gray-400" />
+                    {/* Online Payment - with alert */}
+                    <div className="flex items-center space-x-3 p-4 border rounded-lg opacity-75 cursor-pointer" 
+                         onClick={(e) => {
+                           e.preventDefault()
+                           e.stopPropagation()
+                           handlePaymentMethodChange("online")
+                         }}>
+                      <RadioGroupItem value="online" id="online" disabled />
+                      <Label htmlFor="online" className="flex items-center space-x-3 cursor-pointer flex-1">
+                        <CreditCard className="h-5 w-5 text-blue-600" />
+                        <div>
+                          <p className="font-medium">Online Payment</p>
+                          <p className="text-sm text-gray-500">UPI, Cards, Net Banking</p>
                         </div>
                       </Label>
+                      <Badge variant="outline" className="bg-orange-100 text-orange-800">Coming Soon</Badge>
                     </div>
                   </RadioGroup>
+
+                  {paymentMethod === "cod" && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm text-green-800">
+                        ✅ Cash on Delivery selected. Pay ₹{total.toFixed(2)} when your order arrives.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
 
-            {/* Order Summary */}
-            <div className="lg:col-span-1">
-              <Card className="sticky top-4">
+            {/* Order Summary Sidebar */}
+            <div className="space-y-6">
+              <Card>
                 <CardHeader>
                   <CardTitle>Order Summary</CardTitle>
                 </CardHeader>
@@ -541,44 +492,52 @@ export default function CheckoutPage() {
                   {/* Order Items */}
                   <div className="space-y-3">
                     {items.map((item) => (
-                      <div key={item.cart_id} className="flex justify-between text-sm">
-                        <div className="flex-1">
-                          <p className="font-medium">{item.product_name}</p>
-                          <p className="text-gray-500">Qty: {item.quantity}</p>
+                      <div key={item.product_id} className="flex items-center space-x-3">
+                        <div className="w-12 h-12 bg-gray-100 rounded-md flex items-center justify-center">
+                          <span className="text-xs font-medium">{item.quantity}x</span>
                         </div>
-                        <p className="font-medium">₹{(item.discount_price * item.quantity).toFixed(0)}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{item.product_name}</p>
+                          <p className="text-sm text-gray-500">₹{item.price} each</p>
+                        </div>
+                        <p className="text-sm font-medium">₹{(item.price * item.quantity).toFixed(2)}</p>
                       </div>
                     ))}
                   </div>
 
                   <Separator />
 
+                  {/* Price Breakdown */}
                   <div className="space-y-2">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-sm">
                       <span>Subtotal</span>
-                      <span>₹{subtotal.toFixed(0)}</span>
+                      <span>₹{subtotal.toFixed(2)}</span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between text-sm">
                       <span>Shipping</span>
-                      <span>{shipping === 0 ? "Free" : `₹${shipping}`}</span>
+                      <span>{shipping === 0 ? "Free" : `₹${shipping.toFixed(2)}`}</span>
+                    </div>
+                    <Separator />
+                    <div className="flex justify-between font-semibold">
+                      <span>Total</span>
+                      <span>₹{total.toFixed(2)}</span>
                     </div>
                   </div>
 
-                  <Separator />
-
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span>₹{total.toFixed(0)}</span>
-                  </div>
-
+                  {/* Place Order Button */}
                   <Button
                     type="submit"
                     className="w-full bg-emerald-600 hover:bg-emerald-700"
-                    size="lg"
-                    disabled={isLoading}
+                    disabled={isLoading || !selectedAddressId}
                   >
-                    {isLoading ? "Placing Order..." : "Place Order"}
+                    {isLoading ? "Placing Order..." : `Place Order - ₹${total.toFixed(2)}`}
                   </Button>
+
+                  {subtotal < 500 && (
+                    <p className="text-xs text-center text-gray-500">
+                      Add ₹{(500 - subtotal).toFixed(2)} more for free delivery
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </div>
