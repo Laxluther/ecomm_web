@@ -22,7 +22,7 @@ import { useAuth } from "@/lib/auth"
 import { CreditCard, Wallet, Truck, Plus, MapPin, Home, Building } from "lucide-react"
 import api from "@/lib/api"
 import toast from "react-hot-toast"
-
+import { addressesAPI } from "@/lib/api"
 interface Address {
   address_id: number
   type: string
@@ -69,7 +69,7 @@ export default function CheckoutPage() {
   const { data: addressesData } = useQuery({
     queryKey: ["addresses"],
     queryFn: async () => {
-      const response = await api.get("/user/addresses")
+      const response = await addressesAPI.getAll()
       return response.data
     },
     enabled: isAuthenticated,

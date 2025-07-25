@@ -24,6 +24,8 @@ def create_app():
     from admin.routes import admin_bp
     from user.routes import user_bp
     from shared.routes import shared_bp
+    from user.auth import user_auth_bp
+    app.register_blueprint(user_auth_bp, url_prefix='/api/user/auth')
     
     app.register_blueprint(admin_bp, url_prefix='/api/admin')
     app.register_blueprint(user_bp, url_prefix='/api/user')

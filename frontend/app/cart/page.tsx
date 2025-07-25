@@ -15,7 +15,7 @@ import { useCartStore } from "@/lib/store"
 import { useAuth } from "@/lib/auth"
 import api from "@/lib/api"
 import toast from "react-hot-toast"
-
+import { cartAPI } from "@/lib/api"
 export default function CartPage() {
   const { items, setItems, updateQuantity, removeItem, getTotalItems, getTotalPrice } = useCartStore()
   const { isAuthenticated } = useAuth()
@@ -23,7 +23,7 @@ export default function CartPage() {
   const { data: cartData, refetch } = useQuery({
     queryKey: ["cart"],
     queryFn: async () => {
-      const response = await api.get("/user/cart")
+      const response = await cartAPI.get()
       return response.data
     },
     enabled: isAuthenticated,
