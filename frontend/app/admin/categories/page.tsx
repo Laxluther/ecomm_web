@@ -460,82 +460,88 @@ export default function AdminCategoriesPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Enhanced Delete Confirmation Dialog */}
-        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center space-x-2">
-                {forceDelete ? (
-                  <>
-                    <AlertTriangle className="h-5 w-5 text-orange-500" />
-                    <span>Force Delete Category</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-5 w-5 text-red-500" />
-                    <span>Delete Category</span>
-                  </>
-                )}
-              </DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <p>
-                Are you sure you want to delete "<strong>{categoryToDelete?.category_name}</strong>"?
-              </p>
-              
-              {forceDelete && (categoryToDelete?.product_count || 0) > 0 && (
-                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                  <div className="flex">
-                    <AlertTriangle className="h-5 w-5 text-orange-400 flex-shrink-0" />
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-orange-800">
-                        Force Delete Warning
-                      </h3>
-                      <div className="mt-2 text-sm text-orange-700">
-                        <p>This will delete the category that contains <strong>{categoryToDelete.product_count} products</strong>.</p>
-                        <ul className="list-disc pl-5 mt-2 space-y-1">
-                          <li>Products will be moved to "Uncategorized"</li>
-                          <li>This action cannot be undone</li>
-                          <li>Products will not be deleted</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {!forceDelete && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex">
-                    <Package className="h-5 w-5 text-blue-400 flex-shrink-0" />
-                    <div className="ml-3">
-                      <h3 className="text-sm font-medium text-blue-800">
-                        Safe Delete
-                      </h3>
-                      <div className="mt-2 text-sm text-blue-700">
-                        <p>This category {(categoryToDelete?.product_count || 0) === 0 ? "has no products and " : ""}can be safely deleted.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
+        /* Enhanced Delete Confirmation Dialog */
+<Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+  <DialogContent>
+    <DialogHeader>
+      <DialogTitle className="flex items-center space-x-2">
+        {forceDelete ? (
+          <>
+            <AlertTriangle className="h-5 w-5 text-orange-500" />
+            <span>Force Delete Category</span>
+          </>
+        ) : (
+          <>
+            <Trash2 className="h-5 w-5 text-red-500" />
+            <span>Delete Category</span>
+          </>
+        )}
+      </DialogTitle>
+    </DialogHeader>
+    
+    <div className="space-y-4">
+      <p>
+        Are you sure you want to delete "<strong>{categoryToDelete?.category_name}</strong>"?
+      </p>
+      
+      {forceDelete && (categoryToDelete?.product_count || 0) > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-orange-400 flex-shrink-0" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-orange-800">
+                Force Delete Warning
+              </h3>
+              <div className="mt-2 text-sm text-orange-700">
+                <p>This will delete the category that contains <strong>{categoryToDelete.product_count} products</strong>.</p>
+                <ul className="list-disc pl-5 mt-2 space-y-1">
+                  <li><strong>Products will be set to INACTIVE status</strong></li>
+                  <li>Products will NOT appear in shipping or frontend</li>
+                  <li>Products will be removed from carts and wishlists</li>
+                  <li>This action cannot be undone</li>
+                  <li>Products can be reactivated later if needed</li>
+                </ul>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
-                Cancel
-              </Button>
-              <Button 
-                variant={forceDelete ? "destructive" : "destructive"}
-                onClick={confirmDelete}
-                disabled={deleteCategoryMutation.isLoading}
-              >
-                {deleteCategoryMutation.isLoading ? "Deleting..." : forceDelete ? "Force Delete" : "Delete Category"}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+      {!forceDelete && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex">
+            <Package className="h-5 w-5 text-blue-400 flex-shrink-0" />
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-blue-800">
+                Safe Delete
+              </h3>
+              <div className="mt-2 text-sm text-blue-700">
+                <p>This category {(categoryToDelete?.product_count || 0) === 0 ? 
+                  "has no products and can be safely deleted." : 
+                  `contains ${categoryToDelete?.product_count} products and cannot be deleted without moving them first.`}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+
+    <DialogFooter>
+      <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+        Cancel
+      </Button>
+      <Button 
+        variant="destructive" 
+        onClick={confirmDelete}
+        disabled={deleteCategoryMutation.isLoading}
+      >
+        {deleteCategoryMutation.isLoading ? "Deleting..." : 
+         forceDelete ? "Force Delete & Deactivate Products" : "Delete Category"}
+      </Button>
+    </DialogFooter>
+  </DialogContent>
+</Dialog>
       </div>
     </AdminLayout>
   )

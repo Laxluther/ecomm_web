@@ -448,8 +448,6 @@ def update_category(admin_id, category_id):
     
     return jsonify({'message': 'Category updated successfully'}), 200
 
-# Replace ONLY the delete_category function in your backend/admin/routes.py
-
 @admin_bp.route('/categories/<int:category_id>', methods=['DELETE'])
 @admin_token_required
 def delete_category(admin_id, category_id):
@@ -482,59 +480,38 @@ def delete_category(admin_id, category_id):
                 'product_count': product_count['count']
             }), 400
         else:
-            # Force delete - handle products first
+            # Force delete - MAKE PRODUCTS INACTIVE INSTEAD OF MOVING TO UNCATEGORIZED
             print(f"Force deleting category {category_id} with {product_count['count']} products")
             
-            # Option 1: Find or create "Uncategorized" category
-            uncategorized = execute_query("""
-                SELECT category_id FROM categories 
-                WHERE category_name = 'Uncategorized' AND status = 'active'
-            """, fetch_one=True)
-            
-            if not uncategorized:
-                print("Creating 'Uncategorized' category")
-                # Create "Uncategorized" category - USE ONLY VALID STATUS VALUES
-                try:
-                    uncategorized_id = execute_query("""
-                        INSERT INTO categories (category_name, description, sort_order, status, created_at)
-                        VALUES (%s, %s, %s, %s, %s)
-                    """, ('Uncategorized', 'Products without a specific category', 999, 'active', datetime.now()), get_insert_id=True)
-                    
-                    print(f"Created 'Uncategorized' category with ID: {uncategorized_id}")
-                    
-                except Exception as e:
-                    print(f"Error creating Uncategorized category: {e}")
-                    # If creation fails, try to find any existing category to move products to
-                    fallback_category = execute_query("""
-                        SELECT category_id FROM categories 
-                        WHERE category_id != %s AND status = 'active'
-                        ORDER BY category_id LIMIT 1
-                    """, (category_id,), fetch_one=True)
-                    
-                    if fallback_category:
-                        uncategorized_id = fallback_category['category_id']
-                        print(f"Using fallback category ID: {uncategorized_id}")
-                    else:
-                        return jsonify({'error': 'Cannot create fallback category for products'}), 500
-            else:
-                uncategorized_id = uncategorized['category_id']
-                print(f"Using existing 'Uncategorized' category ID: {uncategorized_id}")
-            
-            # Move all products from the deleted category to "Uncategorized"
+            # Set all products in this category to inactive status
             try:
                 execute_query("""
                     UPDATE products 
-                    SET category_id = %s, updated_at = %s 
+                    SET status = 'inactive', updated_at = %s 
                     WHERE category_id = %s AND status != 'inactive'
-                """, (uncategorized_id, datetime.now(), category_id))
+                """, (datetime.now(), category_id))
                 
-                print(f"Moved {product_count['count']} products to category {uncategorized_id}")
+                print(f"Set {product_count['count']} products to inactive status")
+                
+                # Clean up related data for inactive products
+                inactive_products = execute_query("""
+                    SELECT product_id FROM products 
+                    WHERE category_id = %s AND status = 'inactive'
+                """, (category_id,), fetch_all=True)
+                
+                for product in inactive_products:
+                    product_id = product['product_id']
+                    # Remove from carts and wishlists
+                    execute_query("DELETE FROM cart WHERE product_id = %s", (product_id,))
+                    execute_query("DELETE FROM wishlist WHERE product_id = %s", (product_id,))
+                
+                print(f"Cleaned up cart and wishlist entries for inactive products")
                 
             except Exception as e:
-                print(f"Error moving products: {e}")
-                return jsonify({'error': 'Failed to move products to new category'}), 500
+                print(f"Error setting products inactive: {e}")
+                return jsonify({'error': 'Failed to update products status'}), 500
     
-    # Now delete the category (change status to inactive instead of soft delete)
+    # Now delete the category (change status to inactive)
     try:
         execute_query("""
             UPDATE categories 
@@ -551,16 +528,21 @@ def delete_category(admin_id, category_id):
     # Clear cache
     try:
         current_app.cache.delete('active_categories')
+        current_app.cache.delete('featured_products')
+        # Clear product caches for affected products
+        if product_count['count'] > 0:
+            for product in inactive_products:
+                current_app.cache.delete(f'product_detail_{product["product_id"]}')
     except:
         pass  # Cache delete is not critical
     
     success_message = 'Category deleted successfully'
     if product_count['count'] > 0 and force:
-        success_message += f' (moved {product_count["count"]} products to Uncategorized)'
+        success_message += f' ({product_count["count"]} products set to inactive)'
     
     return jsonify({
         'message': success_message,
-        'products_moved': product_count['count'] if force else 0
+        'products_affected': product_count['count'] if force else 0
     }), 200
 
 @admin_bp.route('/categories/<int:category_id>', methods=['GET'])
