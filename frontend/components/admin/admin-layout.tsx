@@ -60,9 +60,11 @@ export function AdminLayout({ children }: AdminLayoutProps) {
         </div>
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - FIXED VERSION */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        } transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
@@ -104,7 +106,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           <div className="border-t p-4">
             <div className="flex items-center space-x-3 mb-4">
               <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                <span className="text-emerald-600 font-medium text-sm">{admin?.username?.charAt(0).toUpperCase()}</span>
+                <span className="text-emerald-600 font-medium text-sm">
+                  {admin?.username?.charAt(0).toUpperCase()}
+                </span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{admin?.full_name}</p>
