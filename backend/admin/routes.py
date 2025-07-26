@@ -43,6 +43,7 @@ def admin_login():
 @admin_bp.route('/dashboard', methods=['GET'])
 @admin_token_required
 def get_dashboard_stats(admin_id):
+    """Get dashboard statistics for admin panel"""
     # Get date ranges
     today = datetime.now().date()
     week_ago = today - timedelta(days=7)
@@ -55,8 +56,14 @@ def get_dashboard_stats(admin_id):
         WHERE DATE(created_at) >= %s
     """, (week_ago,), fetch_one=True)
     
+    new_users_month = execute_query("""
+        SELECT COUNT(*) as count FROM users 
+        WHERE DATE(created_at) >= %s
+    """, (month_ago,), fetch_one=True)
+    
     # Get product stats
     total_products = execute_query("SELECT COUNT(*) as count FROM products WHERE status = 'active'", fetch_one=True)
+    featured_products = execute_query("SELECT COUNT(*) as count FROM products WHERE status = 'active' AND is_featured = 1", fetch_one=True)
     low_stock = execute_query("""
         SELECT COUNT(*) as count FROM inventory i
         JOIN products p ON i.product_id = p.product_id
@@ -86,24 +93,67 @@ def get_dashboard_stats(admin_id):
         WHERE DATE(created_at) >= %s AND status NOT IN ('cancelled', 'refunded')
     """, (month_ago,), fetch_one=True)
     
+    # Get referral stats
+    referral_stats = execute_query("""
+        SELECT 
+            COUNT(DISTINCT rc.id) as total_codes,
+            COUNT(ru.id) as total_uses,
+            SUM(CASE WHEN ru.reward_given = 1 THEN 1 ELSE 0 END) as successful_referrals,
+            SUM(CASE WHEN ru.reward_given = 1 THEN 50 ELSE 0 END) as total_rewards_paid
+        FROM referral_codes rc
+        LEFT JOIN referral_uses ru ON rc.id = ru.referral_code_id
+        WHERE rc.status = 'active'
+    """, fetch_one=True)
+    
+    # Get recent orders for dashboard
+    recent_orders = execute_query("""
+        SELECT o.order_id, o.total_amount as total, o.status, o.created_at,
+               CONCAT(u.first_name, ' ', u.last_name) as customer_name
+        FROM orders o
+        JOIN users u ON o.user_id = u.user_id
+        ORDER BY o.created_at DESC
+        LIMIT 5
+    """, fetch_all=True)
+    
+    # Format recent orders
+    formatted_recent_orders = []
+    for order in recent_orders:
+        formatted_recent_orders.append({
+            'order_id': order['order_id'],
+            'total': float(order['total']),
+            'status': order['status'],
+            'customer_name': order['customer_name'],
+            'created_at': order['created_at'].strftime('%Y-%m-%d %H:%M:%S') if order['created_at'] else ''
+        })
+    
+    # Return data in the format expected by frontend
     return jsonify({
-        'users': {
-            'total': total_users['count'],
-            'new_this_week': new_users_week['count']
+        'stats': {
+            'users': {
+                'total_users': total_users['count'] if total_users else 0,
+                'new_users_30d': new_users_month['count'] if new_users_month else 0,
+                'new_users_7d': new_users_week['count'] if new_users_week else 0
+            },
+            'products': {
+                'total_products': total_products['count'] if total_products else 0,
+                'featured_products': featured_products['count'] if featured_products else 0,
+                'low_stock': low_stock['count'] if low_stock else 0
+            },
+            'orders': {
+                'total_orders': total_orders['count'] if total_orders else 0,
+                'orders_this_week': orders_week['count'] if orders_week else 0,
+                'pending_orders': pending_orders['count'] if pending_orders else 0,
+                'total_revenue': float(total_revenue['revenue']) if total_revenue else 0.0,
+                'revenue_this_month': float(revenue_month['revenue']) if revenue_month else 0.0
+            },
+            'referrals': {
+                'total_codes': referral_stats['total_codes'] if referral_stats else 0,
+                'total_uses': referral_stats['total_uses'] if referral_stats else 0,
+                'successful_referrals': referral_stats['successful_referrals'] if referral_stats else 0,
+                'total_rewards_paid': float(referral_stats['total_rewards_paid']) if referral_stats else 0.0
+            }
         },
-        'products': {
-            'total': total_products['count'],
-            'low_stock': low_stock['count']
-        },
-        'orders': {
-            'total': total_orders['count'],
-            'this_week': orders_week['count'],
-            'pending': pending_orders['count']
-        },
-        'revenue': {
-            'total': float(total_revenue['revenue']),
-            'this_month': float(revenue_month['revenue'])
-        }
+        'recent_orders': formatted_recent_orders
     }), 200
 
 @admin_bp.route('/products', methods=['GET'])
