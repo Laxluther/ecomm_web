@@ -749,3 +749,179 @@ def clear_cache(admin_id):
         message = 'Product cache cleared'
     
     return jsonify({'message': message}), 200
+
+@admin_bp.route('/referrals', methods=['GET'])
+@admin_token_required
+def get_all_referrals(admin_id):
+    """Get all referrals with pagination and filtering"""
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 20, type=int), 100)
+    search = request.args.get('search', '').strip()
+    status_filter = request.args.get('status', '').strip()
+    
+    # Base query to get referral data
+    base_query = """
+        SELECT 
+            r.user_id as referral_id,
+            referrer.first_name as referrer_name,
+            referrer.last_name as referrer_last_name,
+            referrer.email as referrer_email,
+            referred.first_name as referred_name,
+            referred.last_name as referred_last_name,
+            referred.email as referred_email,
+            referrer.referral_code as code,
+            referred.created_at as date,
+            CASE 
+                WHEN referred.status = 'active' THEN 'approved'
+                WHEN referred.status = 'inactive' THEN 'rejected'
+                ELSE 'pending'
+            END as status,
+            '50.00' as reward
+        FROM users r
+        JOIN users referrer ON r.referred_by = referrer.user_id
+        JOIN users referred ON r.user_id = referred.user_id
+        WHERE r.referred_by IS NOT NULL
+    """
+    
+    # Add search filter
+    if search:
+        base_query += """ AND (
+            referrer.first_name LIKE %s OR 
+            referrer.last_name LIKE %s OR 
+            referrer.email LIKE %s OR
+            referred.first_name LIKE %s OR 
+            referred.last_name LIKE %s OR 
+            referred.email LIKE %s OR
+            referrer.referral_code LIKE %s
+        )"""
+        search_param = f"%{search}%"
+        search_params = [search_param] * 7
+    else:
+        search_params = []
+    
+    # Add status filter
+    if status_filter and status_filter != 'all':
+        if status_filter == 'approved':
+            base_query += " AND referred.status = 'active'"
+        elif status_filter == 'rejected':
+            base_query += " AND referred.status = 'inactive'"
+        elif status_filter == 'pending':
+            base_query += " AND referred.status NOT IN ('active', 'inactive')"
+    
+    # Get total count
+    count_query = f"SELECT COUNT(*) as total FROM ({base_query}) as referral_count"
+    total_result = execute_query(count_query, search_params, fetch_one=True)
+    total = total_result['total'] if total_result else 0
+    
+    # Add pagination
+    offset = (page - 1) * per_page
+    base_query += f" ORDER BY referred.created_at DESC LIMIT {per_page} OFFSET {offset}"
+    
+    # Execute main query
+    referrals = execute_query(base_query, search_params, fetch_all=True)
+    
+    # Format the results
+    formatted_referrals = []
+    for ref in referrals:
+        formatted_referrals.append({
+            'referral_id': ref['referral_id'],
+            'referrer_name': f"{ref['referrer_name']} {ref['referrer_last_name']}",
+            'referrer_email': ref['referrer_email'],
+            'referred_name': f"{ref['referred_name']} {ref['referred_last_name']}",
+            'referred_email': ref['referred_email'],
+            'code': ref['code'],
+            'date': ref['date'].strftime('%Y-%m-%d') if ref['date'] else '',
+            'status': ref['status'],
+            'reward': ref['reward']
+        })
+    
+    # Calculate stats
+    stats = {
+        'total': total,
+        'pending': len([r for r in formatted_referrals if r['status'] == 'pending']),
+        'approved': len([r for r in formatted_referrals if r['status'] == 'approved']),
+        'rejected': len([r for r in formatted_referrals if r['status'] == 'rejected']),
+        'total_rewards': sum(float(r['reward']) for r in formatted_referrals if r['status'] == 'approved')
+    }
+    
+    return jsonify({
+        'referrals': formatted_referrals,
+        'stats': stats,
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total': total,
+            'pages': (total + per_page - 1) // per_page
+        }
+    }), 200
+
+@admin_bp.route('/referrals/<int:referral_id>/status', methods=['PUT'])
+@admin_token_required
+def update_referral_status(admin_id, referral_id):
+    """Update referral status (approve/reject)"""
+    data = request.get_json()
+    new_status = data.get('status', '').strip().lower()
+    
+    if new_status not in ['approved', 'rejected', 'pending']:
+        return jsonify({'error': 'Invalid status. Must be approved, rejected, or pending'}), 400
+    
+    # Map frontend status to database status
+    db_status_map = {
+        'approved': 'active',
+        'rejected': 'inactive', 
+        'pending': 'pending'
+    }
+    db_status = db_status_map[new_status]
+    
+    # Update the referred user's status
+    execute_query("""
+        UPDATE users 
+        SET status = %s, updated_at = NOW()
+        WHERE user_id = %s AND referred_by IS NOT NULL
+    """, (db_status, referral_id))
+    
+    # If approved, add wallet bonus
+    if new_status == 'approved':
+        # Add bonus to referrer's wallet
+        referrer = execute_query("""
+            SELECT referred_by FROM users WHERE user_id = %s
+        """, (referral_id,), fetch_one=True)
+        
+        if referrer:
+            execute_query("""
+                UPDATE wallet 
+                SET balance = balance + 50, updated_at = NOW()
+                WHERE user_id = %s
+            """, (referrer['referred_by'],))
+            
+            # Log the transaction
+            execute_query("""
+                INSERT INTO wallet_transactions (user_id, type, amount, description, created_at)
+                VALUES (%s, 'credit', 50.00, 'Referral bonus', NOW())
+            """, (referrer['referred_by'],))
+    
+    return jsonify({'message': f'Referral status updated to {new_status}'}), 200
+
+@admin_bp.route('/referrals/stats', methods=['GET'])
+@admin_token_required  
+def get_referral_stats(admin_id):
+    """Get referral statistics for admin dashboard"""
+    stats = execute_query("""
+        SELECT 
+            COUNT(*) as total_referrals,
+            SUM(CASE WHEN referred.status = 'active' THEN 1 ELSE 0 END) as approved_referrals,
+            SUM(CASE WHEN referred.status = 'inactive' THEN 1 ELSE 0 END) as rejected_referrals,
+            SUM(CASE WHEN referred.status NOT IN ('active', 'inactive') THEN 1 ELSE 0 END) as pending_referrals,
+            SUM(CASE WHEN referred.status = 'active' THEN 50 ELSE 0 END) as total_rewards_paid
+        FROM users referrer
+        JOIN users referred ON referrer.user_id = referred.referred_by
+        WHERE referred.referred_by IS NOT NULL
+    """, fetch_one=True)
+    
+    return jsonify({
+        'total_referrals': stats['total_referrals'] or 0,
+        'approved_referrals': stats['approved_referrals'] or 0,
+        'rejected_referrals': stats['rejected_referrals'] or 0, 
+        'pending_referrals': stats['pending_referrals'] or 0,
+        'total_rewards_paid': float(stats['total_rewards_paid'] or 0)
+    }), 200
