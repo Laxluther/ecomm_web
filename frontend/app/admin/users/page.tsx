@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -12,429 +14,487 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Mail, Search, UserCheck, UserMinus, Users, Send, Filter, RefreshCcw } from "lucide-react"
 import { AdminLayout } from "@/components/admin/admin-layout"
 import { toast } from "react-hot-toast"
+import { adminUsersAPI } from "@/lib/api"
 
-// Mock API for admin users
-const adminApi = {
-  get: async (url: string) => {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    if (url === "/users") {
-      return {
-        data: {
-          users: Array.from({ length: 20 }, (_, i) => ({
-            user_id: i + 1,
-            name: `User ${i + 1}`,
-            email: `user${i + 1}@example.com`,
-            phone: `+1 555-${String(1000 + i).padStart(4, "0")}`,
-            status: Math.random() > 0.2 ? "active" : "suspended",
-            orders: Math.floor(Math.random() * 20),
-            spent: Math.floor(Math.random() * 1000) + 50,
-            joined: new Date(Date.now() - Math.floor(Math.random() * 10000000000)).toISOString().split("T")[0],
-            last_login: new Date(Date.now() - Math.floor(Math.random() * 1000000000)).toISOString().split("T")[0],
-          })),
-        },
-      }
-    }
-    return { data: {} }
-  },
-  post: async (url: string, data: any) => {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 800))
-
-    if (url.includes("/users/") && url.includes("/send-email")) {
-      return { data: { success: true } }
-    }
-
-    if (url === "/newsletter/send") {
-      return { data: { success: true, recipients: 20 } }
-    }
-
-    return { data: {} }
-  },
-  put: async (url: string, data: any) => {
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 600))
-
-    if (url.includes("/users/") && url.includes("/status")) {
-      return { data: { success: true } }
-    }
-
-    return { data: {} }
-  },
+interface User {
+  user_id: number
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  status: "active" | "inactive" | "suspended"
+  created_at: string
+  is_premium: boolean
+  total_orders: number
+  total_spent: number
 }
 
 export default function AdminUsersPage() {
   const router = useRouter()
-  const [users, setUsers] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
+  
+  // State management
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedUser, setSelectedUser] = useState<any>(null)
-  const [emailModalOpen, setEmailModalOpen] = useState(false)
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [emailDialog, setEmailDialog] = useState(false)
+  const [selectedUsers, setSelectedUsers] = useState<number[]>([])
   const [emailSubject, setEmailSubject] = useState("")
   const [emailMessage, setEmailMessage] = useState("")
-  const [sendingEmail, setSendingEmail] = useState(false)
-  const [newsletterModalOpen, setNewsletterModalOpen] = useState(false)
-  const [newsletterSubject, setNewsletterSubject] = useState("")
-  const [newsletterMessage, setNewsletterMessage] = useState("")
-  const [newsletterTarget, setNewsletterTarget] = useState("all")
-  const [sendingNewsletter, setSendingNewsletter] = useState(false)
-  const [statusFilter, setStatusFilter] = useState("all")
 
-  useEffect(() => {
-    fetchUsers()
-  }, [])
+  // Fetch users with real API
+  const { data: usersData, isLoading, refetch, error } = useQuery({
+    queryKey: ["admin-users", currentPage, searchTerm, statusFilter],
+    queryFn: async () => {
+      const params: any = {
+        page: currentPage,
+        per_page: 20,
+      }
+      
+      if (searchTerm.trim()) {
+        params.search = searchTerm.trim()
+      }
+      
+      if (statusFilter !== "all") {
+        params.status = statusFilter
+      }
 
-  const fetchUsers = async () => {
-    setLoading(true)
-    try {
-      const response = await adminApi.get("/users")
-      setUsers(response.data.users)
-    } catch (error) {
-      toast.error("Failed to load users")
-    } finally {
-      setLoading(false)
-    }
-  }
+      const response = await adminUsersAPI.getAll(params)
+      return response
+    },
+    staleTime: 30000, // Cache for 30 seconds
+    retry: 2, // Retry failed requests 2 times
+  })
 
-  const handleViewUser = (user: any) => {
+  // Update user status mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ userId, status }: { userId: string; status: string }) => {
+      await adminUsersAPI.updateStatus(userId, status)
+    },
+    onSuccess: () => {
+      toast.success("User status updated successfully")
+      queryClient.invalidateQueries({ queryKey: ["admin-users"] })
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Failed to update user status")
+    },
+  })
+
+  // Send email mutation (using real API endpoint)
+  const sendEmailMutation = useMutation({
+    mutationFn: async (emailData: any) => {
+      // Using the adminApi instance from your lib/api.ts
+      const { adminApi } = await import("@/lib/api")
+      const response = await adminApi.post("/users/send-email", emailData)
+      return response.data
+    },
+    onSuccess: (data) => {
+      toast.success(`Email sent to ${data.recipients_count} users`)
+      setEmailDialog(false)
+      setSelectedUsers([])
+      setEmailSubject("")
+      setEmailMessage("")
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || "Failed to send email")
+    },
+  })
+
+  const users = Array.isArray(usersData?.users) ? usersData.users : []
+  const totalPages = Math.ceil((usersData?.total || 0) / 20)
+
+  const handleUserClick = (user: User) => {
     router.push(`/admin/users/${user.user_id}`)
   }
 
-  const handleSendEmail = (user: any) => {
-    setSelectedUser(user)
-    setEmailModalOpen(true)
+  const handleStatusUpdate = (userId: number, newStatus: string) => {
+    updateStatusMutation.mutate({ 
+      userId: userId.toString(), 
+      status: newStatus 
+    })
   }
 
-  const handleToggleStatus = async (user: any) => {
-    try {
-      const newStatus = user.status === "active" ? "suspended" : "active"
-      await adminApi.put(`/users/${user.user_id}/status`, { status: newStatus })
-
-      // Update local state
-      setUsers(users.map((u) => (u.user_id === user.user_id ? { ...u, status: newStatus } : u)))
-
-      toast.success(`User ${user.name} ${newStatus === "active" ? "activated" : "suspended"}`)
-    } catch (error) {
-      toast.error("Failed to update user status")
+  const handleBulkEmail = () => {
+    if (selectedUsers.length === 0) {
+      toast.error("Please select at least one user")
+      return
     }
+    setEmailDialog(true)
   }
 
-  const submitEmail = async () => {
+  const handleSendEmail = () => {
     if (!emailSubject.trim() || !emailMessage.trim()) {
-      toast.error("Please fill in all fields")
+      toast.error("Please fill in both subject and message")
       return
     }
 
-    setSendingEmail(true)
-    try {
-      await adminApi.post(`/users/${selectedUser.user_id}/send-email`, {
-        subject: emailSubject,
-        message: emailMessage,
-      })
+    sendEmailMutation.mutate({
+      user_ids: selectedUsers,
+      subject: emailSubject,
+      message: emailMessage,
+    })
+  }
 
-      toast.success(`Email sent to ${selectedUser.name}`)
-      setEmailModalOpen(false)
-      setEmailSubject("")
-      setEmailMessage("")
-    } catch (error) {
-      toast.error("Failed to send email")
-    } finally {
-      setSendingEmail(false)
+  const handleSelectUser = (userId: number) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    )
+  }
+
+  const handleSelectAll = () => {
+    if (selectedUsers.length === users.length) {
+      setSelectedUsers([])
+    } else {
+      setSelectedUsers(users.map(user => user.user_id))
     }
   }
 
-  const submitNewsletter = async () => {
-    if (!newsletterSubject.trim() || !newsletterMessage.trim()) {
-      toast.error("Please fill in all fields")
-      return
-    }
-
-    setSendingNewsletter(true)
-    try {
-      const response = await adminApi.post("/newsletter/send", {
-        subject: newsletterSubject,
-        message: newsletterMessage,
-        target: newsletterTarget,
-      })
-
-      toast.success(`Newsletter sent to ${response.data.recipients} recipients`)
-      setNewsletterModalOpen(false)
-      setNewsletterSubject("")
-      setNewsletterMessage("")
-    } catch (error) {
-      toast.error("Failed to send newsletter")
-    } finally {
-      setSendingNewsletter(false)
-    }
-  }
-
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.phone.includes(searchTerm)
-
-    if (statusFilter === "all") return matchesSearch
-    return matchesSearch && user.status === statusFilter
+  const filteredUsers = users.filter((user: User) => {
+    const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
+    const matchesSearch = fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         (user.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesStatus = statusFilter === "all" || user.status === statusFilter
+    return matchesSearch && matchesStatus
   })
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "active": return "bg-green-100 text-green-800"
+      case "inactive": return "bg-gray-100 text-gray-800"
+      case "suspended": return "bg-red-100 text-red-800"
+      default: return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <AdminLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">User Management</h1>
+            <div className="animate-pulse h-10 w-32 bg-gray-200 rounded"></div>
+          </div>
+          <div className="animate-pulse space-y-4">
+            <div className="h-10 bg-gray-200 rounded"></div>
+            <div className="h-64 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      </AdminLayout>
+    )
+  }
+
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold">User Management</h1>
+            <Button onClick={() => refetch()} variant="outline">
+              <RefreshCcw className="h-4 w-4 mr-2" />
+              Retry
+            </Button>
+          </div>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-8">
+                <p className="text-red-600 mb-4">Failed to load users</p>
+                <Button onClick={() => refetch()}>Try Again</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </AdminLayout>
+    )
+  }
 
   return (
     <AdminLayout>
-      <div className="p-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold mb-4 md:mb-0">User Management</h1>
-          <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
-            <div className="relative w-full md:w-64">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-              <Input
-                placeholder="Search users..."
-                className="pl-8"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setStatusFilter(statusFilter === "all" ? "active" : "all")}
-              >
-                <Filter className="h-4 w-4" />
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">User Management</h1>
+          <div className="flex items-center gap-3">
+            <Button 
+              onClick={() => refetch()} 
+              variant="outline" 
+              size="sm"
+              disabled={isLoading}
+            >
+              <RefreshCcw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            {selectedUsers.length > 0 && (
+              <Button onClick={handleBulkEmail} size="sm">
+                <Send className="h-4 w-4 mr-2" />
+                Email Selected ({selectedUsers.length})
               </Button>
-              <Button variant="outline" size="icon" onClick={fetchUsers}>
-                <RefreshCcw className="h-4 w-4" />
-              </Button>
-              <Button onClick={() => setNewsletterModalOpen(true)}>
-                <Send className="h-4 w-4 mr-2" /> Send Newsletter
-              </Button>
-            </div>
+            )}
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 mb-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{users.length}</div>
+              <div className="text-2xl font-bold">{usersData?.total || 0}</div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Users</CardTitle>
+              <UserCheck className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{users.filter((user) => user.status === "active").length}</div>
+              <div className="text-2xl font-bold text-green-600">
+                {users.filter((u: User) => u.status === "active").length}
+              </div>
             </CardContent>
           </Card>
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">New Users (30 days)</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Premium Users</CardTitle>
+              <UserCheck className="h-4 w-4 text-yellow-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {
-                  users.filter((user) => {
-                    const joinDate = new Date(user.joined)
-                    const thirtyDaysAgo = new Date()
-                    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-                    return joinDate >= thirtyDaysAgo
-                  }).length
-                }
+              <div className="text-2xl font-bold text-yellow-600">
+                {users.filter((u: User) => u.is_premium).length}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Inactive Users</CardTitle>
+              <UserMinus className="h-4 w-4 text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {users.filter((u: User) => u.status === "inactive" || u.status === "suspended").length}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="all" className="mb-6">
-          <TabsList>
-            <TabsTrigger value="all" onClick={() => setStatusFilter("all")}>
-              All Users
-            </TabsTrigger>
-            <TabsTrigger value="active" onClick={() => setStatusFilter("active")}>
-              Active
-            </TabsTrigger>
-            <TabsTrigger value="suspended" onClick={() => setStatusFilter("suspended")}>
-              Suspended
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search by name or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+                <TabsList>
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="active">Active</TabsTrigger>
+                  <TabsTrigger value="inactive">Inactive</TabsTrigger>
+                  <TabsTrigger value="suspended">Suspended</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </CardContent>
+        </Card>
 
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead className="hidden md:table-cell">Email</TableHead>
-                <TableHead className="hidden md:table-cell">Phone</TableHead>
-                <TableHead className="hidden md:table-cell">Joined</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="hidden md:table-cell">Orders</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    {Array.from({ length: 8 }).map((_, j) => (
-                      <TableCell key={j}>
-                        <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+        {/* Users Table */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">
+                      <input
+                        type="checkbox"
+                        checked={selectedUsers.length === users.length && users.length > 0}
+                        onChange={handleSelectAll}
+                        className="rounded border-gray-300"
+                      />
+                    </TableHead>
+                    <TableHead>User</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Orders</TableHead>
+                    <TableHead>Total Spent</TableHead>
+                    <TableHead>Joined</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user: User) => (
+                    <TableRow 
+                      key={user.user_id} 
+                      className="cursor-pointer hover:bg-gray-50"
+                      onClick={() => handleUserClick(user)}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.includes(user.user_id)}
+                          onChange={() => handleSelectUser(user.user_id)}
+                          className="rounded border-gray-300"
+                        />
                       </TableCell>
-                    ))}
-                  </TableRow>
-                ))
-              ) : filteredUsers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-4">
-                    No users found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredUsers.map((user) => (
-                  <TableRow key={user.user_id}>
-                    <TableCell>{user.user_id}</TableCell>
-                    <TableCell>{user.name}</TableCell>
-                    <TableCell className="hidden md:table-cell">{user.email}</TableCell>
-                    <TableCell className="hidden md:table-cell">{user.phone}</TableCell>
-                    <TableCell className="hidden md:table-cell">{user.joined}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.status === "active" ? "success" : "destructive"}>{user.status}</Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">{user.orders}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleViewUser(user)} title="View Profile">
-                          <Users className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleSendEmail(user)} title="Send Email">
-                          <Mail className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleStatus(user)}
-                          title={user.status === "active" ? "Suspend User" : "Activate User"}
-                        >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-medium text-blue-600">
+                              {(user.first_name || user.email || 'U').charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <div className="font-medium">
+                              {`${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email || 'Unknown User'}
+                            </div>
+                            {user.is_premium && (
+                              <Badge variant="secondary" className="text-xs">
+                                Premium
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          <div>{user.email || 'No email'}</div>
+                          <div className="text-gray-500">{user.phone || 'No phone'}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(user.status)}>
+                          {user.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{user.total_orders || 0}</TableCell>
+                      <TableCell>₹{(user.total_spent || 0).toFixed(2)}</TableCell>
+                      <TableCell>
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2">
                           {user.status === "active" ? (
-                            <UserMinus className="h-4 w-4 text-red-500" />
+                            <Button
+                              onClick={() => handleStatusUpdate(user.user_id, "suspended")}
+                              variant="outline"
+                              size="sm"
+                              disabled={updateStatusMutation.isPending}
+                            >
+                              Suspend
+                            </Button>
                           ) : (
-                            <UserCheck className="h-4 w-4 text-green-500" />
+                            <Button
+                              onClick={() => handleStatusUpdate(user.user_id, "active")}
+                              variant="outline"
+                              size="sm"
+                              disabled={updateStatusMutation.isPending}
+                            >
+                              Activate
+                            </Button>
                           )}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {filteredUsers.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  No users found matching your criteria
+                </div>
               )}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-
-      {/* Email Modal */}
-      <Dialog open={emailModalOpen} onOpenChange={setEmailModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Send Email to {selectedUser?.name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="subject" className="text-sm font-medium">
-                Subject
-              </label>
-              <Input
-                id="subject"
-                placeholder="Email subject"
-                value={emailSubject}
-                onChange={(e) => setEmailSubject(e.target.value)}
-              />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="message" className="text-sm font-medium">
-                Message
-              </label>
-              <textarea
-                id="message"
-                rows={6}
-                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Your message"
-                value={emailMessage}
-                onChange={(e) => setEmailMessage(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEmailModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={submitEmail} disabled={sendingEmail}>
-              {sendingEmail ? "Sending..." : "Send Email"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {/* Newsletter Modal */}
-      <Dialog open={newsletterModalOpen} onOpenChange={setNewsletterModalOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Send Newsletter</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <label htmlFor="target" className="text-sm font-medium">
-                Target Audience
-              </label>
-              <select
-                id="target"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                value={newsletterTarget}
-                onChange={(e) => setNewsletterTarget(e.target.value)}
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-6">
+                <div className="text-sm text-gray-500">
+                  Showing {((currentPage - 1) * 20) + 1} to {Math.min(currentPage * 20, usersData?.total || 0)} of {usersData?.total || 0} users
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Email Dialog */}
+        <Dialog open={emailDialog} onOpenChange={setEmailDialog}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Send Email to Selected Users</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="subject">Subject</Label>
+                <Input
+                  id="subject"
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  placeholder="Email subject..."
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="message">Message</Label>
+                <textarea
+                  id="message"
+                  value={emailMessage}
+                  onChange={(e) => setEmailMessage(e.target.value)}
+                  placeholder="Email message..."
+                  rows={6}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button 
+                variant="outline" 
+                onClick={() => setEmailDialog(false)}
+                disabled={sendEmailMutation.isPending}
               >
-                <option value="all">All Users</option>
-                <option value="active">Active Users Only</option>
-                <option value="premium">Premium Users Only</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="newsletter-subject" className="text-sm font-medium">
-                Subject
-              </label>
-              <Input
-                id="newsletter-subject"
-                placeholder="Newsletter subject"
-                value={newsletterSubject}
-                onChange={(e) => setNewsletterSubject(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <label htmlFor="newsletter-message" className="text-sm font-medium">
-                Message
-              </label>
-              <textarea
-                id="newsletter-message"
-                rows={6}
-                className="w-full min-h-[100px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Newsletter content"
-                value={newsletterMessage}
-                onChange={(e) => setNewsletterMessage(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setNewsletterModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={submitNewsletter} disabled={sendingNewsletter}>
-              {sendingNewsletter ? "Sending..." : "Send Newsletter"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleSendEmail}
+                disabled={sendEmailMutation.isPending}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {sendEmailMutation.isPending ? "Sending..." : `Send to ${selectedUsers.length} users`}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </AdminLayout>
   )
 }

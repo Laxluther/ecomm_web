@@ -654,7 +654,7 @@ def get_orders(admin_id):
     query = """
         SELECT o.order_id, o.total_amount, o.status, o.created_at,
                u.first_name, u.last_name, u.email,
-               COUNT(oi.order_item_id) as item_count
+               COUNT(oi.item_id) as item_count
         FROM orders o
         JOIN users u ON o.user_id = u.user_id
         LEFT JOIN order_items oi ON o.order_id = oi.order_id

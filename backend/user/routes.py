@@ -664,7 +664,7 @@ def remove_from_wishlist(user_id, product_id):
 @user_token_required
 def get_orders(user_id):
     orders = execute_query("""
-        SELECT o.*, COUNT(oi.order_item_id) as item_count
+        SELECT o.*, COUNT(oi.item_id) as item_count
         FROM orders o 
         LEFT JOIN order_items oi ON o.order_id = oi.order_id
         WHERE o.user_id = %s
