@@ -13,10 +13,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Search, Plus, MoreHorizontal, Edit, Trash2, Eye, Package } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search, Plus, MoreHorizontal, Edit, Trash2, Eye, Package, Upload, ExternalLink } from "lucide-react"
 import { adminCategoriesAPI } from "@/lib/api"
+import { useRouter } from "next/navigation"
 import toast from "react-hot-toast"
 
 export default function AdminCategoriesPage() {
@@ -30,10 +32,13 @@ export default function AdminCategoriesPage() {
     description: "",
     image_url: "",
     sort_order: 0,
+    status: "active",
   })
 
+  const router = useRouter()
   const queryClient = useQueryClient()
 
+  // Fetch categories
   const { data: categoriesData, isLoading } = useQuery({
     queryKey: ["admin-categories", searchQuery],
     queryFn: async () => {
@@ -41,6 +46,7 @@ export default function AdminCategoriesPage() {
     },
   })
 
+  // Add category mutation
   const addCategoryMutation = useMutation({
     mutationFn: async (categoryData: any) => {
       return await adminCategoriesAPI.add(categoryData)
@@ -52,10 +58,11 @@ export default function AdminCategoriesPage() {
       resetForm()
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to add category")
+      toast.error(error.response?.data?.error || "Failed to add category")
     },
   })
 
+  // Update category mutation
   const updateCategoryMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       return await adminCategoriesAPI.update(id, data)
@@ -68,10 +75,11 @@ export default function AdminCategoriesPage() {
       resetForm()
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to update category")
+      toast.error(error.response?.data?.error || "Failed to update category")
     },
   })
 
+  // Delete category mutation
   const deleteCategoryMutation = useMutation({
     mutationFn: async (categoryId: number) => {
       return await adminCategoriesAPI.delete(categoryId)
@@ -83,7 +91,7 @@ export default function AdminCategoriesPage() {
       setCategoryToDelete(null)
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || "Failed to delete category")
+      toast.error(error.response?.data?.error || "Failed to delete category")
       setDeleteConfirmOpen(false)
     },
   })
@@ -94,6 +102,7 @@ export default function AdminCategoriesPage() {
       description: "",
       image_url: "",
       sort_order: 0,
+      status: "active",
     })
     setEditingCategory(null)
   }
@@ -110,6 +119,7 @@ export default function AdminCategoriesPage() {
       description: category.description || "",
       image_url: category.image_url || "",
       sort_order: category.sort_order || 0,
+      status: category.status || "active",
     })
     setIsDialogOpen(true)
   }
@@ -117,6 +127,10 @@ export default function AdminCategoriesPage() {
   const handleDelete = (category: any) => {
     setCategoryToDelete(category)
     setDeleteConfirmOpen(true)
+  }
+
+  const handleViewProducts = (category: any) => {
+    router.push(`/admin/products?category=${category.category_id}`)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -145,6 +159,12 @@ export default function AdminCategoriesPage() {
     }
   }
 
+  // Filter categories based on search
+  const filteredCategories = categoriesData?.categories?.filter((category: any) => 
+    category.category_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    category.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || []
+
   return (
     <AdminLayout>
       <div className="space-y-6">
@@ -165,7 +185,7 @@ export default function AdminCategoriesPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
-                placeholder="Search categories..."
+                placeholder="Search categories by name or description..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -177,14 +197,27 @@ export default function AdminCategoriesPage() {
         {/* Categories Table */}
         <Card>
           <CardHeader>
-            <CardTitle>All Categories ({categoriesData?.categories?.length || 0})</CardTitle>
+            <CardTitle>All Categories ({filteredCategories.length})</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
-                  <div key={i} className="h-12 bg-gray-200 rounded animate-pulse"></div>
+                  <div key={i} className="h-16 bg-gray-200 rounded animate-pulse"></div>
                 ))}
+              </div>
+            ) : filteredCategories.length === 0 ? (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">
+                  {searchQuery ? "No categories found matching your search." : "No categories yet. Add your first category!"}
+                </p>
+                {!searchQuery && (
+                  <Button onClick={handleAdd} className="mt-4">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Category
+                  </Button>
+                )}
               </div>
             ) : (
               <Table>
@@ -199,7 +232,7 @@ export default function AdminCategoriesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categoriesData?.categories?.map((category: any) => (
+                  {filteredCategories.map((category: any) => (
                     <TableRow key={category.category_id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
@@ -220,18 +253,41 @@ export default function AdminCategoriesPage() {
                           </div>
                           <div>
                             <p className="font-medium">{category.category_name}</p>
-                            <p className="text-sm text-gray-500">{category.description}</p>
+                            <p className="text-sm text-gray-500 line-clamp-1">
+                              {category.description || "No description"}
+                            </p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">
-                          {category.product_count || 0} products
-                        </Badge>
+                        <div className="flex items-center space-x-2">
+                          <Badge variant="outline">
+                            {category.product_count || 0} products
+                          </Badge>
+                          {(category.product_count || 0) > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleViewProducts(category)}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell>{category.sort_order || 0}</TableCell>
                       <TableCell>
-                        <Badge variant={category.status === "active" ? "default" : "secondary"}>
+                        <Badge variant="secondary">{category.sort_order || 0}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge 
+                          variant={
+                            category.status === "active" 
+                              ? "default" 
+                              : category.status === "inactive" 
+                              ? "secondary" 
+                              : "destructive"
+                          }
+                        >
                           {category.status || "active"}
                         </Badge>
                       </TableCell>
@@ -248,9 +304,9 @@ export default function AdminCategoriesPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleViewProducts(category)}>
                               <Eye className="h-4 w-4 mr-2" />
-                              View Products
+                              View Products ({category.product_count || 0})
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleEdit(category)}>
                               <Edit className="h-4 w-4 mr-2" />
@@ -259,6 +315,7 @@ export default function AdminCategoriesPage() {
                             <DropdownMenuItem
                               className="text-red-600"
                               onClick={() => handleDelete(category)}
+                              disabled={(category.product_count || 0) > 0}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Delete
@@ -276,7 +333,7 @@ export default function AdminCategoriesPage() {
 
         {/* Add/Edit Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent>
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
                 {editingCategory ? "Edit Category" : "Add New Category"}
@@ -310,21 +367,55 @@ export default function AdminCategoriesPage() {
                   <Label htmlFor="image_url">Image URL</Label>
                   <Input
                     id="image_url"
+                    type="url"
                     value={formData.image_url}
                     onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                    placeholder="Enter image URL"
+                    placeholder="https://example.com/image.jpg"
                   />
+                  {formData.image_url && (
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500 mb-2">Image preview:</p>
+                      <div className="h-20 w-20 relative bg-gray-100 rounded-lg overflow-hidden">
+                        <Image
+                          src={formData.image_url}
+                          alt="Preview"
+                          fill
+                          className="object-cover"
+                          sizes="80px"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <Label htmlFor="sort_order">Sort Order</Label>
-                  <Input
-                    id="sort_order"
-                    type="number"
-                    value={formData.sort_order}
-                    onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
-                    placeholder="0"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="sort_order">Sort Order</Label>
+                    <Input
+                      id="sort_order"
+                      type="number"
+                      value={formData.sort_order}
+                      onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                      placeholder="0"
+                      min="0"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={formData.status}
+                      onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
 
@@ -349,10 +440,38 @@ export default function AdminCategoriesPage() {
             <DialogHeader>
               <DialogTitle>Delete Category</DialogTitle>
             </DialogHeader>
-            <p>
-              Are you sure you want to delete "{categoryToDelete?.category_name}"? This action cannot be undone.
-              All products in this category will need to be recategorized.
-            </p>
+            <div className="space-y-4">
+              <p>
+                Are you sure you want to delete "<strong>{categoryToDelete?.category_name}</strong>"?
+              </p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <Package className="h-5 w-5 text-yellow-400" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-yellow-800">
+                      Important Notes:
+                    </h3>
+                    <div className="mt-2 text-sm text-yellow-700">
+                      <ul className="list-disc pl-5 space-y-1">
+                        <li>This action cannot be undone</li>
+                        <li>Products in this category will need to be recategorized</li>
+                        <li>Category with products cannot be deleted</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {(categoryToDelete?.product_count || 0) > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-sm text-red-700">
+                    <strong>Cannot delete:</strong> This category contains {categoryToDelete.product_count} products. 
+                    Please move or delete the products first.
+                  </p>
+                </div>
+              )}
+            </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
                 Cancel
@@ -360,9 +479,9 @@ export default function AdminCategoriesPage() {
               <Button 
                 variant="destructive" 
                 onClick={confirmDelete}
-                disabled={deleteCategoryMutation.isLoading}
+                disabled={deleteCategoryMutation.isLoading || (categoryToDelete?.product_count || 0) > 0}
               >
-                {deleteCategoryMutation.isLoading ? "Deleting..." : "Delete"}
+                {deleteCategoryMutation.isLoading ? "Deleting..." : "Delete Category"}
               </Button>
             </DialogFooter>
           </DialogContent>
