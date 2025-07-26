@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import Image from "next/image"
@@ -15,7 +16,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Search, Plus, MoreHorizontal, Edit, Trash2, Eye, Package, ExternalLink, AlertTriangle } from "lucide-react"
 import { adminCategoriesAPI } from "@/lib/api"
 import { useRouter } from "next/navigation"
@@ -47,41 +47,7 @@ export default function AdminCategoriesPage() {
     },
   })
 
-  // Delete category mutation with force option
-  const deleteCategoryMutation = useMutation({
-    mutationFn: async ({ categoryId, force }: { categoryId: number; force: boolean }) => {
-      if (force) {
-        // If force delete, you might want to create a special endpoint
-        // For now, we'll use the regular delete and handle the error
-        try {
-          return await adminCategoriesAPI.delete(categoryId)
-        } catch (error: any) {
-          if (error.response?.status === 400) {
-            // Force delete by moving products to uncategorized first
-            console.log("Force deleting category with products...")
-            // You could implement a force delete endpoint here
-            throw new Error("Force delete not yet implemented in backend")
-          }
-          throw error
-        }
-      } else {
-        return await adminCategoriesAPI.delete(categoryId)
-      }
-    },
-    onSuccess: () => {
-      toast.success("Category deleted successfully!")
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] })
-      setDeleteConfirmOpen(false)
-      setCategoryToDelete(null)
-      setForceDelete(false)
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.error || error.message || "Failed to delete category")
-      setDeleteConfirmOpen(false)
-    },
-  })
-
-  // Other mutations (add, update) remain the same...
+  // Add category mutation
   const addCategoryMutation = useMutation({
     mutationFn: async (categoryData: any) => {
       return await adminCategoriesAPI.add(categoryData)
@@ -97,6 +63,7 @@ export default function AdminCategoriesPage() {
     },
   })
 
+  // Update category mutation
   const updateCategoryMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
       return await adminCategoriesAPI.update(id, data)
@@ -110,6 +77,27 @@ export default function AdminCategoriesPage() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.error || "Failed to update category")
+    },
+  })
+
+  // Delete category mutation with force option
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async ({ categoryId, force }: { categoryId: number; force: boolean }) => {
+      return await adminCategoriesAPI.delete(categoryId, force)
+    },
+    onSuccess: (data) => {
+      const message = data.message || "Category deleted successfully!"
+      toast.success(message)
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] })
+      // Also invalidate products since they might have been moved
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] })
+      setDeleteConfirmOpen(false)
+      setCategoryToDelete(null)
+      setForceDelete(false)
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.error || "Failed to delete category")
+      setDeleteConfirmOpen(false)
     },
   })
 
@@ -340,7 +328,7 @@ export default function AdminCategoriesPage() {
                               Edit
                             </DropdownMenuItem>
                             
-                            {/* SOLUTION: Allow delete even with products */}
+                            {/* Force Delete Logic - Allow delete even with products */}
                             {(category.product_count || 0) > 0 ? (
                               <DropdownMenuItem
                                 className="text-orange-600"
@@ -369,7 +357,7 @@ export default function AdminCategoriesPage() {
           </CardContent>
         </Card>
 
-        {/* Add/Edit Dialog - Same as before */}
+        {/* Add/Edit Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
@@ -410,6 +398,20 @@ export default function AdminCategoriesPage() {
                     onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
                     placeholder="https://example.com/image.jpg"
                   />
+                  {formData.image_url && (
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500 mb-2">Image preview:</p>
+                      <div className="h-20 w-20 relative bg-gray-100 rounded-lg overflow-hidden">
+                        <Image
+                          src={formData.image_url}
+                          alt="Preview"
+                          fill
+                          className="object-cover"
+                          sizes="80px"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -493,9 +495,9 @@ export default function AdminCategoriesPage() {
                       <div className="mt-2 text-sm text-orange-700">
                         <p>This will delete the category that contains <strong>{categoryToDelete.product_count} products</strong>.</p>
                         <ul className="list-disc pl-5 mt-2 space-y-1">
-                          <li>Products will become uncategorized</li>
+                          <li>Products will be moved to "Uncategorized"</li>
                           <li>This action cannot be undone</li>
-                          <li>Consider moving products first</li>
+                          <li>Products will not be deleted</li>
                         </ul>
                       </div>
                     </div>
@@ -516,19 +518,6 @@ export default function AdminCategoriesPage() {
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-
-              {forceDelete && (
-                <div className="flex items-center space-x-2">
-                  <Checkbox 
-                    id="confirm-force" 
-                    checked={true}
-                    onChange={() => {}}
-                  />
-                  <Label htmlFor="confirm-force" className="text-sm">
-                    I understand this will affect {categoryToDelete?.product_count} products
-                  </Label>
                 </div>
               )}
             </div>

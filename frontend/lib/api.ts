@@ -287,7 +287,7 @@ export const wishlistAPI = {
 
 // ===== ADMIN APIs =====
 
-// 🔧 BACKWARDS COMPATIBLE: Keep existing adminAPI for login
+// Admin Authentication
 export const adminAPI = {
   login: async (username: string, password: string) => {
     const response = await adminApi.post("/auth/login", { username, password })
@@ -295,7 +295,7 @@ export const adminAPI = {
   },
 }
 
-// 🔧 IMPROVED: Better organized admin APIs for specific features
+// Admin Products
 export const adminProductsAPI = {
   getAll: async (params?: { page?: number; per_page?: number; search?: string }) => {
     const queryParams = new URLSearchParams()
@@ -354,8 +354,10 @@ export const adminCategoriesAPI = {
     return response.data
   },
 
-  delete: async (id: number) => {
-    const response = await adminApi.delete(`/categories/${id}`)
+  delete: async (id: number, force: boolean = false) => {
+    // Add force parameter as query string
+    const queryParam = force ? '?force=true' : ''
+    const response = await adminApi.delete(`/categories/${id}${queryParam}`)
     return response.data
   },
 }

@@ -43,65 +43,67 @@ def admin_login():
 @admin_bp.route('/dashboard', methods=['GET'])
 @admin_token_required
 def get_dashboard_stats(admin_id):
-    # Get date range for stats
+    # Get date ranges
     today = datetime.now().date()
-    last_week = today - timedelta(days=7)
-    last_month = today - timedelta(days=30)
+    week_ago = today - timedelta(days=7)
+    month_ago = today - timedelta(days=30)
     
-    # Total counts
-    total_products = execute_query("SELECT COUNT(*) as count FROM products WHERE status = 'active'", fetch_one=True)['count']
-    total_users = execute_query("SELECT COUNT(*) as count FROM users WHERE status = 'active'", fetch_one=True)['count']
-    total_orders = execute_query("SELECT COUNT(*) as count FROM orders", fetch_one=True)['count']
+    # Get user stats
+    total_users = execute_query("SELECT COUNT(*) as count FROM users", fetch_one=True)
+    new_users_week = execute_query("""
+        SELECT COUNT(*) as count FROM users 
+        WHERE DATE(created_at) >= %s
+    """, (week_ago,), fetch_one=True)
     
-    # Revenue stats
-    total_revenue = execute_query("""
-        SELECT COALESCE(SUM(total_amount), 0) as revenue 
-        FROM orders WHERE status IN ('completed', 'delivered')
-    """, fetch_one=True)['revenue']
-    
-    monthly_revenue = execute_query("""
-        SELECT COALESCE(SUM(total_amount), 0) as revenue 
-        FROM orders 
-        WHERE status IN ('completed', 'delivered') 
-        AND created_at >= %s
-    """, (last_month,), fetch_one=True)['revenue']
-    
-    # Recent orders
-    recent_orders = execute_query("""
-        SELECT o.order_id, o.total_amount, o.status, o.created_at,
-               u.first_name, u.last_name, u.email
-        FROM orders o
-        JOIN users u ON o.user_id = u.user_id
-        ORDER BY o.created_at DESC
-        LIMIT 10
-    """, fetch_all=True)
-    
-    # Low stock products
+    # Get product stats
+    total_products = execute_query("SELECT COUNT(*) as count FROM products WHERE status = 'active'", fetch_one=True)
     low_stock = execute_query("""
-        SELECT p.product_name, i.quantity, i.min_stock_level,
-               (SELECT pi.image_url FROM product_images pi 
-                WHERE pi.product_id = p.product_id AND pi.is_primary = 1 
-                LIMIT 1) as primary_image
-        FROM products p
-        JOIN inventory i ON p.product_id = i.product_id
+        SELECT COUNT(*) as count FROM inventory i
+        JOIN products p ON i.product_id = p.product_id
         WHERE i.quantity <= i.min_stock_level AND p.status = 'active'
-        ORDER BY i.quantity ASC
-        LIMIT 10
-    """, fetch_all=True)
+    """, fetch_one=True)
     
-    # Convert image URLs for low stock products
-    low_stock = convert_products_images(low_stock)
+    # Get order stats
+    total_orders = execute_query("SELECT COUNT(*) as count FROM orders", fetch_one=True)
+    orders_week = execute_query("""
+        SELECT COUNT(*) as count FROM orders 
+        WHERE DATE(created_at) >= %s
+    """, (week_ago,), fetch_one=True)
+    
+    pending_orders = execute_query("""
+        SELECT COUNT(*) as count FROM orders 
+        WHERE status IN ('pending', 'confirmed')
+    """, fetch_one=True)
+    
+    # Get revenue stats
+    total_revenue = execute_query("""
+        SELECT COALESCE(SUM(total_amount), 0) as revenue FROM orders 
+        WHERE status NOT IN ('cancelled', 'refunded')
+    """, fetch_one=True)
+    
+    revenue_month = execute_query("""
+        SELECT COALESCE(SUM(total_amount), 0) as revenue FROM orders 
+        WHERE DATE(created_at) >= %s AND status NOT IN ('cancelled', 'refunded')
+    """, (month_ago,), fetch_one=True)
     
     return jsonify({
-        'stats': {
-            'total_products': total_products,
-            'total_users': total_users,
-            'total_orders': total_orders,
-            'total_revenue': float(total_revenue) if total_revenue else 0,
-            'monthly_revenue': float(monthly_revenue) if monthly_revenue else 0
+        'users': {
+            'total': total_users['count'],
+            'new_this_week': new_users_week['count']
         },
-        'recent_orders': recent_orders,
-        'low_stock': low_stock
+        'products': {
+            'total': total_products['count'],
+            'low_stock': low_stock['count']
+        },
+        'orders': {
+            'total': total_orders['count'],
+            'this_week': orders_week['count'],
+            'pending': pending_orders['count']
+        },
+        'revenue': {
+            'total': float(total_revenue['revenue']),
+            'this_month': float(revenue_month['revenue'])
+        }
     }), 200
 
 @admin_bp.route('/products', methods=['GET'])
@@ -115,8 +117,8 @@ def get_products(admin_id):
     offset = (page - 1) * per_page
     
     query = """
-        SELECT p.product_id, p.product_name, p.sku, p.brand, p.price, 
-               p.discount_price, p.status, p.is_featured, p.created_at,
+        SELECT p.product_id, p.product_name, p.price, p.discount_price, 
+               p.status, p.is_featured, p.sku, p.created_at,
                c.category_name,
                (SELECT pi.image_url FROM product_images pi 
                 WHERE pi.product_id = p.product_id AND pi.is_primary = 1 
@@ -178,9 +180,8 @@ def get_products(admin_id):
 def get_product_by_id(admin_id, product_id):
     product = execute_query("""
         SELECT p.*, c.category_name,
-               (SELECT pi.image_url FROM product_images pi 
-                WHERE pi.product_id = p.product_id AND pi.is_primary = 1 
-                LIMIT 1) as primary_image
+               (SELECT i.quantity FROM inventory i 
+                WHERE i.product_id = p.product_id) as stock_quantity
         FROM products p 
         LEFT JOIN categories c ON p.category_id = c.category_id
         WHERE p.product_id = %s
@@ -189,7 +190,6 @@ def get_product_by_id(admin_id, product_id):
     if not product:
         return jsonify({'error': 'Product not found'}), 404
     
-    # Get product images
     images = execute_query("""
         SELECT * FROM product_images 
         WHERE product_id = %s 
@@ -201,9 +201,10 @@ def get_product_by_id(admin_id, product_id):
     for img in images:
         img['image_url'] = convert_image_url(img['image_url'])
     
-    product['images'] = images
-    
-    return jsonify({'product': product}), 200
+    return jsonify({
+        'product': product,
+        'images': images
+    }), 200
 
 @admin_bp.route('/products', methods=['POST'])
 @admin_token_required
@@ -212,27 +213,24 @@ def create_product(admin_id):
     
     product_name = data.get('product_name', '').strip()
     description = data.get('description', '').strip()
-    category_id = data.get('category_id')
+    price = data.get('price')
+    discount_price = data.get('discount_price')
+    weight = data.get('weight', 0)
     brand = data.get('brand', '').strip()
-    price = float(data.get('price', 0))
-    discount_price = float(data.get('discount_price', 0)) if data.get('discount_price') else None
+    category_id = data.get('category_id')
     sku = data.get('sku', '').strip()
-    weight = float(data.get('weight', 0)) if data.get('weight') else None
-    stock_quantity = int(data.get('stock_quantity', 0))
-    is_featured = bool(data.get('is_featured', False))
+    stock_quantity = data.get('stock_quantity', 0)
+    is_featured = data.get('is_featured', False)
     
-    if not product_name or not category_id or not price:
-        return jsonify({'error': 'Product name, category, and price are required'}), 400
+    if not product_name or not price or not discount_price or not category_id:
+        return jsonify({'error': 'Missing required fields'}), 400
     
     if not sku:
-        import random
-        sku = f"PRD{random.randint(100000, 999999)}"
+        sku = f"SKU{int(datetime.now().timestamp())}"
     
-    # Insert product
     product_id = execute_query("""
-        INSERT INTO products 
-        (product_name, description, category_id, brand, sku, price, discount_price, 
-         weight, is_featured, status, created_at)
+        INSERT INTO products (product_name, description, price, discount_price, 
+                            weight, brand, category_id, sku, is_featured, status, created_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'active', %s)
     """, (product_name, description, category_id, brand, sku, price, discount_price, 
           weight, is_featured, datetime.now()), get_insert_id=True)
@@ -390,18 +388,243 @@ def create_category(admin_id):
     category_name = data.get('category_name', '').strip()
     description = data.get('description', '').strip()
     sort_order = data.get('sort_order', 0)
+    image_url = data.get('image_url', '').strip()
+    status = data.get('status', 'active')
     
     if not category_name:
         return jsonify({'error': 'Category name is required'}), 400
     
     execute_query("""
-        INSERT INTO categories (category_name, description, sort_order, created_at)
-        VALUES (%s, %s, %s, %s)
-    """, (category_name, description, sort_order, datetime.now()))
+        INSERT INTO categories (category_name, description, sort_order, image_url, status, created_at)
+        VALUES (%s, %s, %s, %s, %s, %s)
+    """, (category_name, description, sort_order, image_url, status, datetime.now()))
     
     current_app.cache.delete('active_categories')
     
     return jsonify({'message': 'Category created successfully'}), 201
+
+@admin_bp.route('/categories/<int:category_id>', methods=['PUT'])
+@admin_token_required
+def update_category(admin_id, category_id):
+    data = request.get_json()
+    
+    # Validate category exists
+    existing_category = execute_query("""
+        SELECT category_id FROM categories WHERE category_id = %s
+    """, (category_id,), fetch_one=True)
+    
+    if not existing_category:
+        return jsonify({'error': 'Category not found'}), 404
+    
+    # Get update data
+    category_name = data.get('category_name', '').strip()
+    description = data.get('description', '').strip()
+    sort_order = data.get('sort_order', 0)
+    image_url = data.get('image_url', '').strip()
+    status = data.get('status', 'active')
+    
+    if not category_name:
+        return jsonify({'error': 'Category name is required'}), 400
+    
+    # Check for duplicate name (excluding current category)
+    existing_name = execute_query("""
+        SELECT category_id FROM categories 
+        WHERE category_name = %s AND category_id != %s
+    """, (category_name, category_id), fetch_one=True)
+    
+    if existing_name:
+        return jsonify({'error': 'Category name already exists'}), 400
+    
+    # Update category
+    execute_query("""
+        UPDATE categories 
+        SET category_name = %s, description = %s, sort_order = %s, 
+            image_url = %s, status = %s, updated_at = %s
+        WHERE category_id = %s
+    """, (category_name, description, sort_order, image_url, status, datetime.now(), category_id))
+    
+    # Clear cache
+    current_app.cache.delete('active_categories')
+    
+    return jsonify({'message': 'Category updated successfully'}), 200
+
+# Replace ONLY the delete_category function in your backend/admin/routes.py
+
+@admin_bp.route('/categories/<int:category_id>', methods=['DELETE'])
+@admin_token_required
+def delete_category(admin_id, category_id):
+    # Get force parameter from query string
+    force = request.args.get('force', 'false').lower() == 'true'
+    
+    print(f"Delete category request: category_id={category_id}, force={force}, admin_id={admin_id}")
+    
+    # Validate category exists
+    existing_category = execute_query("""
+        SELECT category_id, category_name FROM categories WHERE category_id = %s
+    """, (category_id,), fetch_one=True)
+    
+    if not existing_category:
+        return jsonify({'error': 'Category not found'}), 404
+    
+    # Check if category has products
+    product_count = execute_query("""
+        SELECT COUNT(*) as count FROM products 
+        WHERE category_id = %s AND status != 'inactive'
+    """, (category_id,), fetch_one=True)
+    
+    print(f"Category {category_id} has {product_count['count']} products")
+    
+    if product_count['count'] > 0:
+        if not force:
+            # Normal delete - reject if has products
+            return jsonify({
+                'error': f'Cannot delete category. It contains {product_count["count"]} products. Please move or delete the products first.',
+                'product_count': product_count['count']
+            }), 400
+        else:
+            # Force delete - handle products first
+            print(f"Force deleting category {category_id} with {product_count['count']} products")
+            
+            # Option 1: Find or create "Uncategorized" category
+            uncategorized = execute_query("""
+                SELECT category_id FROM categories 
+                WHERE category_name = 'Uncategorized' AND status = 'active'
+            """, fetch_one=True)
+            
+            if not uncategorized:
+                print("Creating 'Uncategorized' category")
+                # Create "Uncategorized" category - USE ONLY VALID STATUS VALUES
+                try:
+                    uncategorized_id = execute_query("""
+                        INSERT INTO categories (category_name, description, sort_order, status, created_at)
+                        VALUES (%s, %s, %s, %s, %s)
+                    """, ('Uncategorized', 'Products without a specific category', 999, 'active', datetime.now()), get_insert_id=True)
+                    
+                    print(f"Created 'Uncategorized' category with ID: {uncategorized_id}")
+                    
+                except Exception as e:
+                    print(f"Error creating Uncategorized category: {e}")
+                    # If creation fails, try to find any existing category to move products to
+                    fallback_category = execute_query("""
+                        SELECT category_id FROM categories 
+                        WHERE category_id != %s AND status = 'active'
+                        ORDER BY category_id LIMIT 1
+                    """, (category_id,), fetch_one=True)
+                    
+                    if fallback_category:
+                        uncategorized_id = fallback_category['category_id']
+                        print(f"Using fallback category ID: {uncategorized_id}")
+                    else:
+                        return jsonify({'error': 'Cannot create fallback category for products'}), 500
+            else:
+                uncategorized_id = uncategorized['category_id']
+                print(f"Using existing 'Uncategorized' category ID: {uncategorized_id}")
+            
+            # Move all products from the deleted category to "Uncategorized"
+            try:
+                execute_query("""
+                    UPDATE products 
+                    SET category_id = %s, updated_at = %s 
+                    WHERE category_id = %s AND status != 'inactive'
+                """, (uncategorized_id, datetime.now(), category_id))
+                
+                print(f"Moved {product_count['count']} products to category {uncategorized_id}")
+                
+            except Exception as e:
+                print(f"Error moving products: {e}")
+                return jsonify({'error': 'Failed to move products to new category'}), 500
+    
+    # Now delete the category (change status to inactive instead of soft delete)
+    try:
+        execute_query("""
+            UPDATE categories 
+            SET status = 'inactive', updated_at = %s 
+            WHERE category_id = %s
+        """, (datetime.now(), category_id))
+        
+        print(f"Successfully deleted category {category_id}")
+        
+    except Exception as e:
+        print(f"Error deleting category: {e}")
+        return jsonify({'error': 'Failed to delete category'}), 500
+    
+    # Clear cache
+    try:
+        current_app.cache.delete('active_categories')
+    except:
+        pass  # Cache delete is not critical
+    
+    success_message = 'Category deleted successfully'
+    if product_count['count'] > 0 and force:
+        success_message += f' (moved {product_count["count"]} products to Uncategorized)'
+    
+    return jsonify({
+        'message': success_message,
+        'products_moved': product_count['count'] if force else 0
+    }), 200
+
+@admin_bp.route('/categories/<int:category_id>', methods=['GET'])
+@admin_token_required
+def get_category_by_id(admin_id, category_id):
+    """Get a single category by ID"""
+    category = execute_query("""
+        SELECT c.category_id, c.category_name, c.description, c.status, 
+               c.sort_order, c.created_at, c.updated_at, c.image_url,
+               (SELECT COUNT(*) FROM products 
+                WHERE category_id = c.category_id AND status = 'active') as product_count
+        FROM categories c
+        WHERE c.category_id = %s AND c.status != 'deleted'
+    """, (category_id,), fetch_one=True)
+    
+    if not category:
+        return jsonify({'error': 'Category not found'}), 404
+    
+    return jsonify({'category': category}), 200
+
+@admin_bp.route('/categories/<int:category_id>/products', methods=['GET'])
+@admin_token_required
+def get_category_products(admin_id, category_id):
+    """Get all products in a specific category"""
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    offset = (page - 1) * per_page
+    
+    # Validate category exists
+    category = execute_query("""
+        SELECT category_name FROM categories WHERE category_id = %s AND status != 'deleted'
+    """, (category_id,), fetch_one=True)
+    
+    if not category:
+        return jsonify({'error': 'Category not found'}), 404
+    
+    # Get products in category
+    products = execute_query("""
+        SELECT p.product_id, p.product_name, p.price, p.discount_price, 
+               p.status, p.is_featured, p.primary_image, p.sku,
+               i.quantity as stock_quantity
+        FROM products p
+        LEFT JOIN inventory i ON p.product_id = i.product_id
+        WHERE p.category_id = %s AND p.status != 'deleted'
+        ORDER BY p.product_name
+        LIMIT %s OFFSET %s
+    """, (category_id, per_page, offset), fetch_all=True)
+    
+    # Get total count
+    total_count = execute_query("""
+        SELECT COUNT(*) as count FROM products 
+        WHERE category_id = %s AND status != 'deleted'
+    """, (category_id,), fetch_one=True)
+    
+    return jsonify({
+        'products': products,
+        'category': category,
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total': total_count['count'],
+            'pages': (total_count['count'] + per_page - 1) // per_page
+        }
+    }), 200
 
 @admin_bp.route('/users', methods=['GET'])
 @admin_token_required
@@ -544,150 +767,3 @@ def clear_cache(admin_id):
         message = 'Product cache cleared'
     
     return jsonify({'message': message}), 200
-# Add these routes to your backend/admin/routes.py file
-# Add them after your existing category routes
-
-@admin_bp.route('/categories/<int:category_id>', methods=['PUT'])
-@admin_token_required
-def update_category(admin_id, category_id):
-    data = request.get_json()
-    
-    # Validate category exists
-    existing_category = execute_query("""
-        SELECT category_id FROM categories WHERE category_id = %s
-    """, (category_id,), fetch_one=True)
-    
-    if not existing_category:
-        return jsonify({'error': 'Category not found'}), 404
-    
-    # Get update data
-    category_name = data.get('category_name', '').strip()
-    description = data.get('description', '').strip()
-    sort_order = data.get('sort_order', 0)
-    image_url = data.get('image_url', '').strip()
-    status = data.get('status', 'active')
-    
-    if not category_name:
-        return jsonify({'error': 'Category name is required'}), 400
-    
-    # Check for duplicate name (excluding current category)
-    existing_name = execute_query("""
-        SELECT category_id FROM categories 
-        WHERE category_name = %s AND category_id != %s
-    """, (category_name, category_id), fetch_one=True)
-    
-    if existing_name:
-        return jsonify({'error': 'Category name already exists'}), 400
-    
-    # Update category
-    execute_query("""
-        UPDATE categories 
-        SET category_name = %s, description = %s, sort_order = %s, 
-            image_url = %s, status = %s, updated_at = %s
-        WHERE category_id = %s
-    """, (category_name, description, sort_order, image_url, status, datetime.now(), category_id))
-    
-    # Clear cache
-    current_app.cache.delete('active_categories')
-    
-    return jsonify({'message': 'Category updated successfully'}), 200
-
-@admin_bp.route('/categories/<int:category_id>', methods=['DELETE'])
-@admin_token_required
-def delete_category(admin_id, category_id):
-    # Validate category exists
-    existing_category = execute_query("""
-        SELECT category_id, category_name FROM categories WHERE category_id = %s
-    """, (category_id,), fetch_one=True)
-    
-    if not existing_category:
-        return jsonify({'error': 'Category not found'}), 404
-    
-    # Check if category has products
-    product_count = execute_query("""
-        SELECT COUNT(*) as count FROM products 
-        WHERE category_id = %s AND status != 'deleted'
-    """, (category_id,), fetch_one=True)
-    
-    if product_count['count'] > 0:
-        return jsonify({
-            'error': f'Cannot delete category. It contains {product_count["count"]} products. Please move or delete the products first.'
-        }), 400
-    
-    # Delete category (soft delete)
-    execute_query("""
-        UPDATE categories 
-        SET status = 'deleted', updated_at = %s 
-        WHERE category_id = %s
-    """, (datetime.now(), category_id))
-    
-    # Alternative: Hard delete if you prefer
-    # execute_query("DELETE FROM categories WHERE category_id = %s", (category_id,))
-    
-    # Clear cache
-    current_app.cache.delete('active_categories')
-    
-    return jsonify({'message': 'Category deleted successfully'}), 200
-
-@admin_bp.route('/categories/<int:category_id>', methods=['GET'])
-@admin_token_required
-def get_category_by_id(admin_id, category_id):
-    """Get a single category by ID"""
-    category = execute_query("""
-        SELECT c.category_id, c.category_name, c.description, c.status, 
-               c.sort_order, c.created_at, c.updated_at, c.image_url,
-               (SELECT COUNT(*) FROM products 
-                WHERE category_id = c.category_id AND status = 'active') as product_count
-        FROM categories c
-        WHERE c.category_id = %s AND c.status != 'deleted'
-    """, (category_id,), fetch_one=True)
-    
-    if not category:
-        return jsonify({'error': 'Category not found'}), 404
-    
-    return jsonify({'category': category}), 200
-
-@admin_bp.route('/categories/<int:category_id>/products', methods=['GET'])
-@admin_token_required
-def get_category_products(admin_id, category_id):
-    """Get all products in a specific category"""
-    page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 20))
-    offset = (page - 1) * per_page
-    
-    # Validate category exists
-    category = execute_query("""
-        SELECT category_name FROM categories WHERE category_id = %s AND status != 'deleted'
-    """, (category_id,), fetch_one=True)
-    
-    if not category:
-        return jsonify({'error': 'Category not found'}), 404
-    
-    # Get products in category
-    products = execute_query("""
-        SELECT p.product_id, p.product_name, p.price, p.discount_price, 
-               p.status, p.is_featured, p.primary_image, p.sku,
-               i.quantity as stock_quantity
-        FROM products p
-        LEFT JOIN inventory i ON p.product_id = i.product_id
-        WHERE p.category_id = %s AND p.status != 'deleted'
-        ORDER BY p.product_name
-        LIMIT %s OFFSET %s
-    """, (category_id, per_page, offset), fetch_all=True)
-    
-    # Get total count
-    total_count = execute_query("""
-        SELECT COUNT(*) as count FROM products 
-        WHERE category_id = %s AND status != 'deleted'
-    """, (category_id,), fetch_one=True)
-    
-    return jsonify({
-        'products': products,
-        'category': category,
-        'pagination': {
-            'page': page,
-            'per_page': per_page,
-            'total': total_count['count'],
-            'pages': (total_count['count'] + per_page - 1) // per_page
-        }
-    }), 200
