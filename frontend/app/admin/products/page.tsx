@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import Image from "next/image"
 import { AdminLayout } from "@/components/admin/admin-layout"
 import { Button } from "@/components/ui/button"
@@ -10,14 +10,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Search, Plus, MoreHorizontal, Edit, Trash2, Eye } from "lucide-react"
-import { adminApi } from "@/lib/api"
+import { adminProductsAPI } from "@/lib/api"
 import { useRouter } from "next/navigation"
+import toast from "react-hot-toast"
 
 export default function AdminProductsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [productToDelete, setProductToDelete] = useState<any>(null)
   const router = useRouter()
+  const queryClient = useQueryClient()
 
   const { data: productsData, isLoading } = useQuery({
     queryKey: ["admin-products", currentPage, searchQuery],
@@ -27,10 +32,47 @@ export default function AdminProductsPage() {
       params.append("per_page", "20")
       if (searchQuery) params.append("search", searchQuery)
 
-      const response = await adminApi.get(`/products?${params.toString()}`)
-      return response.data
+      const response = await adminProductsAPI.getAll({
+        page: currentPage,
+        per_page: 20,
+        search: searchQuery || undefined
+      })
+      return response
     },
   })
+
+  // Delete product mutation
+  const deleteProductMutation = useMutation({
+    mutationFn: async (productId: number) => {
+      return await adminProductsAPI.delete(productId)
+    },
+    onSuccess: () => {
+      toast.success("Product deleted successfully!")
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] })
+      setDeleteConfirmOpen(false)
+      setProductToDelete(null)
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || "Failed to delete product")
+      setDeleteConfirmOpen(false)
+    },
+  })
+
+  const handleDeleteClick = (product: any) => {
+    setProductToDelete(product)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (productToDelete) {
+      deleteProductMutation.mutate(productToDelete.product_id)
+    }
+  }
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmOpen(false)
+    setProductToDelete(null)
+  }
 
   return (
     <AdminLayout>
@@ -73,13 +115,13 @@ export default function AdminProductsPage() {
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg animate-pulse">
-                    <div className="w-16 h-16 bg-gray-200 rounded"></div>
+                  <div key={i} className="flex items-center space-x-4 p-4">
+                    <div className="h-16 w-16 bg-gray-200 rounded animate-pulse"></div>
                     <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                      <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                      <div className="h-3 bg-gray-200 rounded animate-pulse w-2/3"></div>
                     </div>
-                    <div className="w-20 h-4 bg-gray-200 rounded"></div>
+                    <div className="h-8 w-20 bg-gray-200 rounded animate-pulse"></div>
                   </div>
                 ))}
               </div>
@@ -100,25 +142,32 @@ export default function AdminProductsPage() {
                     <TableRow key={product.product_id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
-                          <div className="relative w-12 h-12">
-                            <Image
-                              src={product.primary_image || "/placeholder.svg?height=48&width=48"}
-                              alt={product.product_name}
-                              fill
-                              className="object-cover rounded"
-                            />
+                          <div className="h-12 w-12 relative bg-gray-100 rounded-lg overflow-hidden">
+                            {product.primary_image ? (
+                              <Image
+                                src={product.primary_image}
+                                alt={product.product_name}
+                                fill
+                                className="object-cover"
+                                sizes="48px"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                                <span className="text-xs text-gray-400">No image</span>
+                              </div>
+                            )}
                           </div>
                           <div>
                             <p className="font-medium">{product.product_name}</p>
-                            <p className="text-sm text-gray-500">{product.brand}</p>
+                            <p className="text-sm text-gray-500">SKU: {product.sku}</p>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>{product.category_name}</TableCell>
+                      <TableCell>{product.category_name || "N/A"}</TableCell>
                       <TableCell>
                         <div>
                           <p className="font-medium">₹{product.discount_price}</p>
-                          {product.price > product.discount_price && (
+                          {product.price !== product.discount_price && (
                             <p className="text-sm text-gray-500 line-through">₹{product.price}</p>
                           )}
                         </div>
@@ -129,7 +178,9 @@ export default function AdminProductsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={product.status === "active" ? "default" : "secondary"}>{product.status}</Badge>
+                        <Badge variant={product.status === "active" ? "default" : "secondary"}>
+                          {product.status}
+                        </Badge>
                         {product.is_featured && (
                           <Badge variant="outline" className="ml-1">
                             Featured
@@ -152,7 +203,10 @@ export default function AdminProductsPage() {
                               <Edit className="h-4 w-4 mr-2" />
                               Edit
                             </DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-600">
+                            <DropdownMenuItem 
+                              className="text-red-600"
+                              onClick={() => handleDeleteClick(product)}
+                            >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Delete
                             </DropdownMenuItem>
@@ -182,6 +236,31 @@ export default function AdminProductsPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Product</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete "{productToDelete?.product_name}"? This action cannot be undone.
+                The product will be removed from all carts and wishlists.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={handleCancelDelete}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleConfirmDelete}
+                disabled={deleteProductMutation.isLoading}
+              >
+                {deleteProductMutation.isLoading ? "Deleting..." : "Delete"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   )

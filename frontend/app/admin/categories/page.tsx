@@ -13,21 +13,23 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Search, Plus, MoreHorizontal, Edit, Trash2, Eye, Package } from "lucide-react"
-import { adminApi } from "@/lib/api"
+import { adminCategoriesAPI } from "@/lib/api"
 import toast from "react-hot-toast"
 
 export default function AdminCategoriesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<any>(null)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [categoryToDelete, setCategoryToDelete] = useState<any>(null)
   const [formData, setFormData] = useState({
     category_name: "",
     description: "",
     image_url: "",
-    is_active: true,
+    sort_order: 0,
   })
 
   const queryClient = useQueryClient()
@@ -35,18 +37,13 @@ export default function AdminCategoriesPage() {
   const { data: categoriesData, isLoading } = useQuery({
     queryKey: ["admin-categories", searchQuery],
     queryFn: async () => {
-      const params = new URLSearchParams()
-      if (searchQuery) params.append("search", searchQuery)
-
-      const response = await adminApi.get(`/categories?${params.toString()}`)
-      return response.data
+      return await adminCategoriesAPI.getAll()
     },
   })
 
   const addCategoryMutation = useMutation({
     mutationFn: async (categoryData: any) => {
-      const response = await adminApi.post("/categories", categoryData)
-      return response.data
+      return await adminCategoriesAPI.add(categoryData)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-categories"] })
@@ -61,8 +58,7 @@ export default function AdminCategoriesPage() {
 
   const updateCategoryMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const response = await adminApi.put(`/categories/${id}`, data)
-      return response.data
+      return await adminCategoriesAPI.update(id, data)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-categories"] })
@@ -78,15 +74,17 @@ export default function AdminCategoriesPage() {
 
   const deleteCategoryMutation = useMutation({
     mutationFn: async (categoryId: number) => {
-      const response = await adminApi.delete(`/categories/${categoryId}`)
-      return response.data
+      return await adminCategoriesAPI.delete(categoryId)
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-categories"] })
       toast.success("Category deleted successfully!")
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] })
+      setDeleteConfirmOpen(false)
+      setCategoryToDelete(null)
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || "Failed to delete category")
+      setDeleteConfirmOpen(false)
     },
   })
 
@@ -95,167 +93,67 @@ export default function AdminCategoriesPage() {
       category_name: "",
       description: "",
       image_url: "",
-      is_active: true,
+      sort_order: 0,
     })
+    setEditingCategory(null)
   }
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-
-    if (editingCategory) {
-      updateCategoryMutation.mutate({ id: editingCategory.category_id, data: formData })
-    } else {
-      addCategoryMutation.mutate(formData)
-    }
+  const handleAdd = () => {
+    resetForm()
+    setIsDialogOpen(true)
   }
 
   const handleEdit = (category: any) => {
     setEditingCategory(category)
     setFormData({
-      category_name: category.category_name,
+      category_name: category.category_name || "",
       description: category.description || "",
       image_url: category.image_url || "",
-      is_active: category.is_active !== false,
+      sort_order: category.sort_order || 0,
     })
     setIsDialogOpen(true)
   }
 
-  const handleDelete = (categoryId: number) => {
-    if (confirm("Are you sure you want to delete this category?")) {
-      deleteCategoryMutation.mutate(categoryId)
+  const handleDelete = (category: any) => {
+    setCategoryToDelete(category)
+    setDeleteConfirmOpen(true)
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!formData.category_name.trim()) {
+      toast.error("Category name is required")
+      return
+    }
+
+    const submitData = {
+      ...formData,
+      sort_order: parseInt(formData.sort_order.toString()) || 0,
+    }
+
+    if (editingCategory) {
+      updateCategoryMutation.mutate({ id: editingCategory.category_id, data: submitData })
+    } else {
+      addCategoryMutation.mutate(submitData)
     }
   }
 
-  // Mock categories data if API doesn't return data
-  const mockCategories = [
-    {
-      category_id: 1,
-      category_name: "Honey & Natural Sweeteners",
-      description: "Pure honey and natural sweeteners for healthy living",
-      image_url: "/placeholder.svg?height=200&width=300",
-      product_count: 5,
-      is_active: true,
-      created_at: "2024-01-01T00:00:00Z",
-    },
-    {
-      category_id: 2,
-      category_name: "Premium Coffee",
-      description: "Finest coffee beans from around the world",
-      image_url: "/placeholder.svg?height=200&width=300",
-      product_count: 5,
-      is_active: true,
-      created_at: "2024-01-01T00:00:00Z",
-    },
-    {
-      category_id: 3,
-      category_name: "Nuts & Dry Fruits",
-      description: "Premium nuts and dried fruits for healthy snacking",
-      image_url: "/placeholder.svg?height=200&width=300",
-      product_count: 5,
-      is_active: true,
-      created_at: "2024-01-01T00:00:00Z",
-    },
-    {
-      category_id: 4,
-      category_name: "Super Seeds",
-      description: "Nutrient-rich seeds for your wellness journey",
-      image_url: "/placeholder.svg?height=200&width=300",
-      product_count: 5,
-      is_active: true,
-      created_at: "2024-01-01T00:00:00Z",
-    },
-  ]
-
-  const categories = categoriesData?.categories || mockCategories
+  const confirmDelete = () => {
+    if (categoryToDelete) {
+      deleteCategoryMutation.mutate(categoryToDelete.category_id)
+    }
+  }
 
   return (
     <AdminLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold">Categories</h1>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button
-                onClick={() => {
-                  setEditingCategory(null)
-                  resetForm()
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Category
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingCategory ? "Edit Category" : "Add New Category"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="category_name">Category Name</Label>
-                  <Input
-                    id="category_name"
-                    name="category_name"
-                    value={formData.category_name}
-                    onChange={handleInputChange}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    rows={3}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="image_url">Image URL</Label>
-                  <Input
-                    id="image_url"
-                    name="image_url"
-                    value={formData.image_url}
-                    onChange={handleInputChange}
-                    placeholder="https://example.com/image.jpg"
-                  />
-                </div>
-
-                <div className="flex space-x-3 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="flex-1"
-                    onClick={() => {
-                      setIsDialogOpen(false)
-                      setEditingCategory(null)
-                      resetForm()
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    className="flex-1"
-                    disabled={addCategoryMutation.isPending || updateCategoryMutation.isPending}
-                  >
-                    {addCategoryMutation.isPending || updateCategoryMutation.isPending
-                      ? "Saving..."
-                      : editingCategory
-                        ? "Update"
-                        : "Add"}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <Button onClick={handleAdd}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Category
+          </Button>
         </div>
 
         {/* Search */}
@@ -264,17 +162,14 @@ export default function AdminCategoriesPage() {
             <CardTitle>Search Categories</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center space-x-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search categories..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Button variant="outline">Filter</Button>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search categories..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
             </div>
           </CardContent>
         </Card>
@@ -282,20 +177,13 @@ export default function AdminCategoriesPage() {
         {/* Categories Table */}
         <Card>
           <CardHeader>
-            <CardTitle>All Categories ({categories.length})</CardTitle>
+            <CardTitle>All Categories ({categoriesData?.categories?.length || 0})</CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="space-y-4">
-                {[...Array(4)].map((_, i) => (
-                  <div key={i} className="flex items-center space-x-4 p-4 border rounded-lg animate-pulse">
-                    <div className="w-16 h-16 bg-gray-200 rounded"></div>
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-1/3"></div>
-                      <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                    </div>
-                    <div className="w-20 h-4 bg-gray-200 rounded"></div>
-                  </div>
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="h-12 bg-gray-200 rounded animate-pulse"></div>
                 ))}
               </div>
             ) : (
@@ -303,45 +191,48 @@ export default function AdminCategoriesPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Category</TableHead>
-                    <TableHead>Description</TableHead>
                     <TableHead>Products</TableHead>
+                    <TableHead>Sort Order</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {categories.map((category: any) => (
+                  {categoriesData?.categories?.map((category: any) => (
                     <TableRow key={category.category_id}>
                       <TableCell>
                         <div className="flex items-center space-x-3">
-                          <div className="relative w-12 h-12">
-                            <Image
-                              src={category.image_url || "/placeholder.svg?height=48&width=48"}
-                              alt={category.category_name}
-                              fill
-                              className="object-cover rounded"
-                            />
+                          <div className="h-10 w-10 relative bg-gray-100 rounded-lg overflow-hidden">
+                            {category.image_url ? (
+                              <Image
+                                src={category.image_url}
+                                alt={category.category_name}
+                                fill
+                                className="object-cover"
+                                sizes="40px"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                                <Package className="h-4 w-4 text-gray-400" />
+                              </div>
+                            )}
                           </div>
                           <div>
                             <p className="font-medium">{category.category_name}</p>
+                            <p className="text-sm text-gray-500">{category.description}</p>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <p className="text-sm text-gray-600 max-w-xs truncate">
-                          {category.description || "No description"}
-                        </p>
+                        <Badge variant="outline">
+                          {category.product_count || 0} products
+                        </Badge>
                       </TableCell>
+                      <TableCell>{category.sort_order || 0}</TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-1">
-                          <Package className="h-4 w-4 text-gray-400" />
-                          <span>{category.product_count || 0}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={category.is_active !== false ? "default" : "secondary"}>
-                          {category.is_active !== false ? "Active" : "Inactive"}
+                        <Badge variant={category.status === "active" ? "default" : "secondary"}>
+                          {category.status || "active"}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -367,7 +258,7 @@ export default function AdminCategoriesPage() {
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               className="text-red-600"
-                              onClick={() => handleDelete(category.category_id)}
+                              onClick={() => handleDelete(category)}
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Delete
@@ -382,6 +273,100 @@ export default function AdminCategoriesPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Add/Edit Dialog */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingCategory ? "Edit Category" : "Add New Category"}
+              </DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="category_name">Category Name *</Label>
+                  <Input
+                    id="category_name"
+                    value={formData.category_name}
+                    onChange={(e) => setFormData({ ...formData, category_name: e.target.value })}
+                    placeholder="Enter category name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Enter description"
+                    rows={3}
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="image_url">Image URL</Label>
+                  <Input
+                    id="image_url"
+                    value={formData.image_url}
+                    onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+                    placeholder="Enter image URL"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="sort_order">Sort Order</Label>
+                  <Input
+                    id="sort_order"
+                    type="number"
+                    value={formData.sort_order}
+                    onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) || 0 })}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="mt-6">
+                <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={addCategoryMutation.isLoading || updateCategoryMutation.isLoading}
+                >
+                  {addCategoryMutation.isLoading || updateCategoryMutation.isLoading ? "Saving..." : "Save"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Category</DialogTitle>
+            </DialogHeader>
+            <p>
+              Are you sure you want to delete "{categoryToDelete?.category_name}"? This action cannot be undone.
+              All products in this category will need to be recategorized.
+            </p>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={confirmDelete}
+                disabled={deleteCategoryMutation.isLoading}
+              >
+                {deleteCategoryMutation.isLoading ? "Deleting..." : "Delete"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AdminLayout>
   )

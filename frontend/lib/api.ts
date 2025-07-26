@@ -86,7 +86,7 @@ adminApi.interceptors.response.use(
   },
 )
 
-// API Functions
+// ===== USER APIs =====
 
 // Authentication
 export const authAPI = {
@@ -133,14 +133,6 @@ export const authAPI = {
   },
 }
 
-// Admin Authentication
-export const adminAPI = {
-  login: async (username: string, password: string) => {
-    const response = await adminApi.post("/auth/login", { username, password })
-    return response
-  },
-}
-
 // Products
 export const productsAPI = {
   getFeatured: async () => {
@@ -148,27 +140,25 @@ export const productsAPI = {
     return response.data
   },
 
-  
-// NEW:
-getAll: async (params?: { 
-  category_id?: string; 
-  search?: string; 
-  page?: number; 
-  per_page?: number;
-  sort_by?: string;  // ADD THIS LINE
-}) => {
-  const cleanParams: Record<string, string> = {}
-  
-  if (params?.category_id) cleanParams.category_id = params.category_id
-  if (params?.search?.trim()) cleanParams.search = params.search.trim()
-  if (params?.page && params.page > 1) cleanParams.page = params.page.toString()
-  if (params?.per_page) cleanParams.per_page = params.per_page.toString()
-  if (params?.sort_by) cleanParams.sort_by = params.sort_by  // ADD THIS LINE
-  
-  const queryString = new URLSearchParams(cleanParams).toString()
-  const response = await api.get(`/products${queryString ? `?${queryString}` : ""}`)
-  return response.data
-},
+  getAll: async (params?: { 
+    category_id?: string; 
+    search?: string; 
+    page?: number; 
+    per_page?: number;
+    sort_by?: string;
+  }) => {
+    const cleanParams: Record<string, string> = {}
+    
+    if (params?.category_id) cleanParams.category_id = params.category_id
+    if (params?.search?.trim()) cleanParams.search = params.search.trim()
+    if (params?.page && params.page > 1) cleanParams.page = params.page.toString()
+    if (params?.per_page) cleanParams.per_page = params.per_page.toString()
+    if (params?.sort_by) cleanParams.sort_by = params.sort_by
+    
+    const queryString = new URLSearchParams(cleanParams).toString()
+    const response = await api.get(`/products${queryString ? `?${queryString}` : ""}`)
+    return response.data
+  },
 
   getById: async (id: string) => {
     const response = await api.get(`/products/${id}`)
@@ -207,8 +197,6 @@ export const cartAPI = {
   },
 }
 
-// Updated section for lib/api.ts - Addresses API
-
 // Addresses
 export const addressesAPI = {
   getAll: async () => {
@@ -217,7 +205,6 @@ export const addressesAPI = {
   },
 
   add: async (addressData: any) => {
-    // Map frontend field names to backend expected field names
     const mappedData = {
       type: addressData.type || "home",
       name: addressData.name,
@@ -230,15 +217,12 @@ export const addressesAPI = {
       landmark: addressData.landmark || "",
       is_default: addressData.is_default || false,
     }
-    
-    console.log("Sending address data:", mappedData) // Debug log
     
     const response = await api.post("/addresses", mappedData)
     return response.data
   },
 
   update: async (id: number, addressData: any) => {
-    // Map frontend field names to backend expected field names
     const mappedData = {
       type: addressData.type || "home",
       name: addressData.name,
@@ -251,8 +235,6 @@ export const addressesAPI = {
       landmark: addressData.landmark || "",
       is_default: addressData.is_default || false,
     }
-    
-    console.log("Updating address data:", mappedData) // Debug log
     
     const response = await api.put(`/addresses/${id}`, mappedData)
     return response.data
@@ -303,11 +285,30 @@ export const wishlistAPI = {
   },
 }
 
-// Admin APIs
+// ===== ADMIN APIs =====
+
+// 🔧 BACKWARDS COMPATIBLE: Keep existing adminAPI for login
+export const adminAPI = {
+  login: async (username: string, password: string) => {
+    const response = await adminApi.post("/auth/login", { username, password })
+    return response
+  },
+}
+
+// 🔧 IMPROVED: Better organized admin APIs for specific features
 export const adminProductsAPI = {
-  getAll: async (params?: { page?: number; per_page?: number }) => {
-    const queryString = params ? new URLSearchParams(params as any).toString() : ""
-    const response = await adminApi.get(`/products${queryString ? `?${queryString}` : ""}`)
+  getAll: async (params?: { page?: number; per_page?: number; search?: string }) => {
+    const queryParams = new URLSearchParams()
+    if (params?.page) queryParams.append("page", params.page.toString())
+    if (params?.per_page) queryParams.append("per_page", params.per_page.toString())
+    if (params?.search) queryParams.append("search", params.search)
+
+    const response = await adminApi.get(`/products${queryParams.toString() ? `?${queryParams.toString()}` : ""}`)
+    return response.data
+  },
+
+  getById: async (id: number) => {
+    const response = await adminApi.get(`/products/${id}`)
     return response.data
   },
 
@@ -325,8 +326,41 @@ export const adminProductsAPI = {
     const response = await adminApi.delete(`/products/${id}`)
     return response.data
   },
+
+  uploadImage: async (id: number, formData: FormData) => {
+    const response = await adminApi.post(`/products/${id}/images`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    })
+    return response.data
+  },
 }
 
+// Admin Categories
+export const adminCategoriesAPI = {
+  getAll: async () => {
+    const response = await adminApi.get("/categories")
+    return response.data
+  },
+
+  add: async (categoryData: any) => {
+    const response = await adminApi.post("/categories", categoryData)
+    return response.data
+  },
+
+  update: async (id: number, categoryData: any) => {
+    const response = await adminApi.put(`/categories/${id}`, categoryData)
+    return response.data
+  },
+
+  delete: async (id: number) => {
+    const response = await adminApi.delete(`/categories/${id}`)
+    return response.data
+  },
+}
+
+// Admin Dashboard
 export const adminDashboardAPI = {
   getStats: async () => {
     const response = await adminApi.get("/dashboard")
@@ -334,35 +368,54 @@ export const adminDashboardAPI = {
   },
 }
 
-export const adminCategoriesAPI = {
-  getAll: async () => {
-    const response = await adminApi.get("/categories")
-    return response.data
-  },
-}
-
+// Admin Users
 export const adminUsersAPI = {
-  getAll: async (params?: { page?: number; per_page?: number }) => {
-    const queryString = params ? new URLSearchParams(params as any).toString() : ""
-    const response = await adminApi.get(`/users${queryString ? `?${queryString}` : ""}`)
+  getAll: async (params?: { page?: number; per_page?: number; search?: string; status?: string }) => {
+    const queryParams = new URLSearchParams()
+    if (params?.page) queryParams.append("page", params.page.toString())
+    if (params?.per_page) queryParams.append("per_page", params.per_page.toString())
+    if (params?.search) queryParams.append("search", params.search)
+    if (params?.status) queryParams.append("status", params.status)
+
+    const response = await adminApi.get(`/users${queryParams.toString() ? `?${queryParams.toString()}` : ""}`)
+    return response.data
+  },
+
+  updateStatus: async (id: string, status: string) => {
+    const response = await adminApi.put(`/users/${id}/status`, { status })
     return response.data
   },
 }
 
+// Admin Orders
 export const adminOrdersAPI = {
-  getAll: async (params?: { page?: number; per_page?: number }) => {
-    const queryString = params ? new URLSearchParams(params as any).toString() : ""
-    const response = await adminApi.get(`/orders${queryString ? `?${queryString}` : ""}`)
+  getAll: async (params?: { page?: number; per_page?: number; status?: string }) => {
+    const queryParams = new URLSearchParams()
+    if (params?.page) queryParams.append("page", params.page.toString())
+    if (params?.per_page) queryParams.append("per_page", params.per_page.toString())
+    if (params?.status) queryParams.append("status", params.status)
+
+    const response = await adminApi.get(`/orders${queryParams.toString() ? `?${queryParams.toString()}` : ""}`)
+    return response.data
+  },
+
+  updateStatus: async (id: string, status: string) => {
+    const response = await adminApi.put(`/orders/${id}/status`, { status })
     return response.data
   },
 }
 
+// Admin Referrals
 export const adminReferralsAPI = {
   getAll: async (params?: { page?: number; per_page?: number }) => {
-    const queryString = params ? new URLSearchParams(params as any).toString() : ""
-    const response = await adminApi.get(`/referrals${queryString ? `?${queryString}` : ""}`)
+    const queryParams = new URLSearchParams()
+    if (params?.page) queryParams.append("page", params.page.toString())
+    if (params?.per_page) queryParams.append("per_page", params.per_page.toString())
+
+    const response = await adminApi.get(`/referrals${queryParams.toString() ? `?${queryParams.toString()}` : ""}`)
     return response.data
   },
 }
 
+// Default export
 export default api
