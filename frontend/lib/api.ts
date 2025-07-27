@@ -167,13 +167,29 @@ export const productsAPI = {
 }
 
 // Categories
+
 export const categoriesAPI = {
   getAll: async () => {
-    const response = await publicApi.get("/public/categories")  
-    return response.data
+    try {
+      console.log("categoriesAPI.getAll: Making request to /public/categories")
+      const response = await publicApi.get("/public/categories")  
+      console.log("categoriesAPI.getAll: Response data:", response.data)
+      
+      // Backend returns: { categories: [...] }
+      // Frontend expects: categoriesData.categories
+      if (response.data && response.data.categories) {
+        console.log("categoriesAPI.getAll: Found", response.data.categories.length, "categories")
+        return response.data  // Return full object so frontend can access .categories
+      } else {
+        console.warn("categoriesAPI.getAll: No categories in response, returning empty")
+        return { categories: [] }
+      }
+    } catch (error) {
+      console.error("categoriesAPI.getAll: Error fetching categories:", error)
+      throw error
+    }
   },
 }
-
 // Cart
 export const cartAPI = {
   get: async () => {

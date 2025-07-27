@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { useSearchParams,useRouter } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { ProductGrid } from "@/components/product/product-grid"
@@ -27,44 +27,60 @@ export default function ShopPage() {
     perPage: 12,
   })
 
+  // FIX: Products query with better error handling
   const {
     data: productsData,
     isLoading: productsLoading,
     error: productsError,
+    refetch: refetchProducts,
   } = useQuery({
     queryKey: ["products", filters.category, filters.search, filters.sortBy, filters.page, filters.perPage],
-queryFn: async () => {
-  const params: any = {
-    page: filters.page,
-    per_page: filters.perPage,
-    sort_by: filters.sortBy,  // CHANGED from sortBy to sort_by
-  }
-  
-  if (filters.category) params.category_id = filters.category
-  if (filters.search) params.search = filters.search
+    queryFn: async () => {
+      const params: any = {
+        page: filters.page,
+        per_page: filters.perPage,
+        sort_by: filters.sortBy,
+      }
+      
+      if (filters.category) params.category_id = filters.category
+      if (filters.search) params.search = filters.search
 
+      console.log("Products API params:", params) // Debug log
       const response = await productsAPI.getAll(params)
+      console.log("Products API response:", response) // Debug log
       return response
     },
     retry: 3,
     retryDelay: 1000,
+    enabled: true, // Always enabled
   })
 
-  const { data: categoriesData, isLoading: categoriesLoading } = useQuery({
+  // FIX: Categories query with consistent data handling
+  const { 
+    data: categoriesData, 
+    isLoading: categoriesLoading,
+    error: categoriesError,
+    refetch: refetchCategories 
+  } = useQuery({
     queryKey: ["categories"],
     queryFn: async () => {
+      console.log("Fetching categories...") // Debug log
       const response = await categoriesAPI.getAll()
+      console.log("Categories API response:", response) // Debug log
       return response
     },
     retry: 3,
     retryDelay: 1000,
+    staleTime: 5 * 60 * 1000, // 5 minutes cache
   })
 
   const handleFilterChange = (key: string, value: string | number) => {
+    console.log(`Filter change: ${key} = ${value}`) // Debug log
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }))
   }
 
   const clearFilters = () => {
+    console.log("Clearing filters") // Debug log
     setFilters({
       category: "",
       search: "",
@@ -73,6 +89,8 @@ queryFn: async () => {
       perPage: 12,
     })
   }
+
+  // FIX: URL synchronization with better handling
   useEffect(() => {
     const params = new URLSearchParams()
     if (filters.category) params.set("category", filters.category)
@@ -83,15 +101,25 @@ queryFn: async () => {
     const newUrl = `/shop${params.toString() ? `?${params.toString()}` : ""}`
     router.replace(newUrl, { scroll: false })
   }, [filters, router])
+
   const activeFiltersCount = [filters.category, filters.search].filter(Boolean).length
 
-  // Safe data extraction
+  // FIX: Safe data extraction with proper null checks
   const products = productsData?.products || []
   const categories = categoriesData?.categories || []
   const pagination = productsData?.pagination || null
   const totalProducts = pagination?.total || products.length
 
-  // Error handling
+  console.log("Render state:", { 
+    productsLoading, 
+    categoriesLoading, 
+    productsCount: products.length, 
+    categoriesCount: categories.length,
+    productsError: productsError?.message,
+    categoriesError: categoriesError?.message
+  }) // Debug log
+
+  // Error handling for products
   if (productsError) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -100,10 +128,13 @@ queryFn: async () => {
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Unable to Load Products</h1>
             <p className="text-gray-600 mb-4">
-              We're having trouble connecting to our servers. Please check if your backend is running on
-              http://localhost:5000
+              We're having trouble connecting to our servers.
+              Please check if your backend is running on http://localhost:5000
             </p>
-            <Button onClick={() => window.location.reload()}>Try Again</Button>
+            <div className="space-x-4">
+              <Button onClick={() => refetchProducts()}>Try Again</Button>
+              <Button onClick={() => window.location.reload()} variant="outline">Refresh Page</Button>
+            </div>
           </div>
         </div>
         <Footer />
@@ -165,13 +196,22 @@ queryFn: async () => {
                         All Categories
                       </Label>
                     </div>
-                    {categoriesLoading ? (
+                    
+                    {/* FIX: Better categories loading and error handling */}
+                    {categoriesError ? (
+                      <div className="text-center py-4">
+                        <p className="text-red-600 text-sm mb-2">Failed to load categories</p>
+                        <Button size="sm" variant="outline" onClick={() => refetchCategories()}>
+                          Retry
+                        </Button>
+                      </div>
+                    ) : categoriesLoading ? (
                       <div className="space-y-2">
                         {[...Array(4)].map((_, i) => (
                           <div key={i} className="h-6 bg-gray-200 rounded animate-pulse"></div>
                         ))}
                       </div>
-                    ) : (
+                    ) : categories.length > 0 ? (
                       categories.map((category: any) => (
                         <div key={category.category_id} className="flex items-center space-x-2">
                           <Checkbox
@@ -191,6 +231,10 @@ queryFn: async () => {
                           </Label>
                         </div>
                       ))
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-gray-500 text-sm">No categories available</p>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -203,10 +247,10 @@ queryFn: async () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                    <SelectItem value="created_at">Newest First</SelectItem>
-<SelectItem value="name">Name</SelectItem>
-<SelectItem value="price_low">Price: Low to High</SelectItem>
-<SelectItem value="price_high">Price: High to Low</SelectItem>
+                      <SelectItem value="created_at">Newest First</SelectItem>
+                      <SelectItem value="name">Name</SelectItem>
+                      <SelectItem value="price_low">Price: Low to High</SelectItem>
+                      <SelectItem value="price_high">Price: High to Low</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -221,7 +265,7 @@ queryFn: async () => {
                 <h1 className="text-2xl font-bold text-gray-900">
                   {filters.category && categories.length > 0
                     ? categories.find((c: any) => c.category_id.toString() === filters.category)?.category_name ||
-                    "Products"
+                      "Products"
                     : "All Products"}
                 </h1>
                 {products.length > 0 && (
