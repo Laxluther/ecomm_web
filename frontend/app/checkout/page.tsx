@@ -22,7 +22,7 @@ import { useAuth } from "@/lib/auth"
 import { CreditCard, Wallet, Truck, Plus, MapPin, Home, Building, Edit } from "lucide-react"
 import api from "@/lib/api"
 import toast from "react-hot-toast"
-
+import { ordersAPI } from "@/lib/api"  // Add this import
 // AddressForm component outside to prevent recreation and focus loss
 interface AddressFormProps {
   isEdit?: boolean
@@ -385,7 +385,7 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-
+  
     try {
       // Validate address selection
       if (!selectedAddressId) {
@@ -393,7 +393,7 @@ export default function CheckoutPage() {
         setIsLoading(false)
         return
       }
-
+  
       const selectedAddress = addressesData?.addresses?.find((addr: Address) => addr.address_id === selectedAddressId)
       
       if (!selectedAddress) {
@@ -401,16 +401,53 @@ export default function CheckoutPage() {
         setIsLoading(false)
         return
       }
-
-      // Simulate order placement
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
+  
+      // Prepare order data
+      const orderData = {
+        items: items.map(item => ({
+          product_id: item.product_id,
+          product_name: item.product_name || item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        shipping_address: {
+          name: selectedAddress.name,
+          phone: selectedAddress.phone,
+          address_line_1: selectedAddress.address_line_1,
+          address_line_2: selectedAddress.address_line_2 || "",
+          city: selectedAddress.city,
+          state: selectedAddress.state,
+          pincode: selectedAddress.pincode,
+          landmark: selectedAddress.landmark || "",
+          type: selectedAddress.type
+        },
+        payment_method: paymentMethod,
+        subtotal: subtotal,
+        shipping_amount: shipping,
+        tax_amount: 0,
+        total_amount: total
+      }
+  
+      console.log("Creating order with data:", orderData) // Debug log
+  
+      // Use the API client instead of fetch
+      const result = await ordersAPI.create(orderData)
+  
       // Clear cart and redirect
       clearCart()
-      toast.success("Order placed successfully!")
+      toast.success(`Order #${result.data.order_number} placed successfully!`)
       router.push("/orders")
-    } catch (error) {
-      toast.error("Failed to place order")
+      
+    } catch (error: any) {
+      console.error("Order creation error:", error)
+      
+      // Better error handling for Axios
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          error.message || 
+                          "Failed to place order"
+      
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }

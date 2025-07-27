@@ -673,7 +673,92 @@ def get_orders(user_id):
     """, (user_id,), fetch_all=True)
     
     return jsonify({'orders': orders}), 200
-
+@user_bp.route('/orders', methods=['POST'])
+@user_token_required
+def create_order(user_id):
+    """Create a new order"""
+    try:
+        data = request.get_json()
+        
+        # Validate required fields
+        required_fields = ['items', 'shipping_address', 'payment_method', 'subtotal', 'total_amount']
+        for field in required_fields:
+            if field not in data:
+                return APIResponse.error(f'Missing required field: {field}', 400)
+        
+        items = data['items']
+        shipping_address = data['shipping_address']
+        payment_method = data['payment_method']
+        subtotal = float(data['subtotal'])
+        shipping_amount = float(data.get('shipping_amount', 0))
+        tax_amount = float(data.get('tax_amount', 0))
+        total_amount = float(data['total_amount'])
+        
+        # Validate items
+        if not items or len(items) == 0:
+            return APIResponse.error('Order must contain at least one item', 400)
+        
+        # Validate payment method
+        if payment_method not in ['cod', 'online', 'wallet']:
+            return APIResponse.error('Invalid payment method', 400)
+        
+        # Generate unique order ID and order number
+        order_id = str(uuid.uuid4())
+        order_number = f"ORD{datetime.now().strftime('%Y%m%d')}{str(uuid.uuid4())[:8].upper()}"
+        
+        # Create the order
+        execute_query("""
+            INSERT INTO orders (
+                order_id, user_id, order_number, status, subtotal, 
+                tax_amount, shipping_amount, total_amount, payment_method, 
+                payment_status, shipping_address, created_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            order_id, user_id, order_number, 'pending',
+            subtotal, tax_amount, shipping_amount, total_amount, 
+            payment_method, 'pending', json.dumps(shipping_address), 
+            datetime.now()
+        ))
+        
+        # Create order items
+        for item in items:
+            product_id = item['product_id']
+            quantity = int(item['quantity'])
+            unit_price = float(item['price'])
+            total_price = unit_price * quantity
+            product_name = item['product_name']
+            
+            execute_query("""
+                INSERT INTO order_items (
+                    order_id, product_id, product_name, quantity, 
+                    unit_price, total_price, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (
+                order_id, product_id, product_name, quantity, 
+                unit_price, total_price, datetime.now()
+            ))
+            
+            # Update inventory (reduce stock)
+            execute_query("""
+                UPDATE inventory SET quantity = quantity - %s 
+                WHERE product_id = %s AND quantity >= %s
+            """, (quantity, product_id, quantity))
+        
+        # Clear the user's cart
+        execute_query("""
+            DELETE FROM cart WHERE user_id = %s
+        """, (user_id,))
+        
+        return APIResponse.success({
+            'order_id': order_id,
+            'order_number': order_number,
+            'status': 'pending',
+            'total_amount': total_amount
+        }, 'Order created successfully')
+        
+    except Exception as e:
+        print(f"Order creation error: {str(e)}")  # Debug log
+        return APIResponse.error(f'Failed to create order: {str(e)}', 500)
 # Referral Routes
 @user_bp.route('/referrals/validate', methods=['POST'])
 def validate_referral():

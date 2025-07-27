@@ -418,6 +418,45 @@ export const adminReferralsAPI = {
     return response.data
   },
 }
+// Orders API - ADD THIS SECTION
+export const ordersAPI = {
+  getAll: async () => {
+    const response = await api.get("/orders")
+    return response.data
+  },
 
+  create: async (orderData: {
+    items: Array<{
+      product_id: number
+      product_name: string
+      quantity: number
+      price: number
+    }>
+    shipping_address: {
+      name: string
+      phone: string
+      address_line_1: string
+      address_line_2?: string
+      city: string
+      state: string
+      pincode: string
+      landmark?: string
+      type: string
+    }
+    payment_method: string
+    subtotal: number
+    shipping_amount: number
+    tax_amount: number
+    total_amount: number
+  }) => {
+    const response = await api.post("/orders", orderData)
+    return response.data
+  },
+
+  getById: async (id: string) => {
+    const response = await api.get(`/orders/${id}`)
+    return response.data
+  },
+}
 // Default export
 export default api
