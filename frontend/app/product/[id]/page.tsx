@@ -1,7 +1,8 @@
 "use client"
 
 import { Label } from "@/components/ui/label"
-
+import { useQueryClient } from "@tanstack/react-query"
+import { ReviewForm, ReviewDisplay } from "@/components/product/review-form"
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useParams } from "next/navigation"
@@ -84,6 +85,27 @@ export default function ProductDetailPage() {
       toast.error("Failed to add item to cart")
     }
   }
+  const queryClient = useQueryClient()
+
+const handleReviewSubmitted = () => {
+  queryClient.invalidateQueries({ queryKey: ["product", productId] })
+  toast.success("Thank you for your review!")
+}
+
+const handleMarkHelpful = async (reviewId: number) => {
+  if (!isAuthenticated) {
+    toast.error("Please login to mark reviews as helpful")
+    return
+  }
+
+  try {
+    await api.post(`/reviews/${reviewId}/helpful`)
+    toast.success("Thank you for your feedback!")
+    queryClient.invalidateQueries({ queryKey: ["product", productId] })
+  } catch (error: any) {
+    toast.error(error.response?.data?.message || "Failed to mark as helpful")
+  }
+}
 
   if (isLoading) {
     return (
@@ -309,42 +331,22 @@ const discountPercentage = productPrice > 0 && productDiscountPrice > 0
         </div>
 
         {/* Reviews Section */}
-        <div className="mt-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Customer Reviews</h2>
-          {reviews.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <p className="text-gray-500">No reviews yet. Be the first to review this product!</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {reviews.map((review: any) => (
-                <Card key={review.review_id}>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium">{review.user_name}</span>
-                        <div className="flex items-center">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              className={`h-4 w-4 ${
-                                i < review.rating ? "fill-yellow-400 text-yellow-400" : "fill-gray-200 text-gray-200"
-                              }`}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                      <span className="text-sm text-gray-500">{review.created_at}</span>
-                    </div>
-                    <p className="text-gray-600">{review.comment}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Reviews Section */}
+<div className="mt-12">
+  <div className="flex items-center justify-between mb-6">
+    <h2 className="text-2xl font-bold text-gray-900">Customer Reviews</h2>
+    <ReviewForm 
+      productId={productId} 
+      onReviewSubmitted={handleReviewSubmitted}
+    />
+  </div>
+  
+  <ReviewDisplay 
+    reviews={reviews} 
+    rating={rating}
+    onMarkHelpful={handleMarkHelpful}
+  />
+</div>
       </div>
 
       <Footer />

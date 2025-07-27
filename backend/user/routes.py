@@ -916,3 +916,143 @@ def get_order_details(user_id, order_id):
     return APIResponse.success({'order': order_details}, 'Order details retrieved successfully')
 
 
+# ADD THIS TO YOUR backend/user/routes.py file
+
+@user_bp.route('/products/<int:product_id>/reviews', methods=['POST'])
+@user_token_required
+def add_product_review(user_id, product_id):
+    """Add a review for a product"""
+    try:
+        data = request.get_json()
+        
+        # Validation
+        rating = data.get('rating')
+        comment = data.get('comment', '').strip()
+        title = data.get('title', '').strip()
+        
+        if not rating or rating < 1 or rating > 5:
+            return APIResponse.error('Rating must be between 1 and 5', 400)
+        
+        if not comment:
+            return APIResponse.error('Comment is required', 400)
+        
+        if len(comment) < 10:
+            return APIResponse.error('Comment must be at least 10 characters long', 400)
+        
+        # Check if user already reviewed this product
+        existing_review = execute_query("""
+            SELECT review_id FROM reviews 
+            WHERE user_id = %s AND product_id = %s
+        """, (user_id, product_id), fetch_one=True)
+        
+        if existing_review:
+            return APIResponse.error('You have already reviewed this product', 400)
+        
+        # Check if product exists
+        product = execute_query("""
+            SELECT product_id FROM products WHERE product_id = %s AND status = 'active'
+        """, (product_id,), fetch_one=True)
+        
+        if not product:
+            return APIResponse.error('Product not found', 404)
+        
+        # Optional: Check if user has purchased this product
+        # You can uncomment this if you want to restrict reviews to only buyers
+        """
+        order_exists = execute_query(\"\"\"
+            SELECT 1 FROM order_items oi
+            JOIN orders o ON oi.order_id = o.order_id
+            WHERE o.user_id = %s AND oi.product_id = %s AND o.status = 'delivered'
+        \"\"\", (user_id, product_id), fetch_one=True)
+        
+        if not order_exists:
+            return APIResponse.error('You can only review products you have purchased', 400)
+        """
+        
+        # Insert the review
+        execute_query("""
+            INSERT INTO reviews (product_id, user_id, rating, title, comment, status, created_at) 
+            VALUES (%s, %s, %s, %s, %s, 'approved', NOW())
+        """, (product_id, user_id, rating, title, comment))
+        
+        return APIResponse.success({
+            'message': 'Review added successfully',
+            'rating': rating,
+            'comment': comment
+        })
+        
+    except Exception as e:
+        print(f"Add review error: {str(e)}")
+        return APIResponse.error('Failed to add review', 500)
+
+@user_bp.route('/products/<int:product_id>/reviews', methods=['GET'])
+def get_product_reviews(product_id):
+    """Get all approved reviews for a product"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('per_page', 10, type=int), 50)
+        offset = (page - 1) * per_page
+        
+        # Get reviews with user info
+        reviews = execute_query("""
+            SELECT r.review_id, r.rating, r.title, r.comment, r.created_at,
+                   u.first_name, u.last_name,
+                   CONCAT(u.first_name, ' ', u.last_name) as user_name
+            FROM reviews r 
+            JOIN users u ON r.user_id = u.user_id 
+            WHERE r.product_id = %s AND r.status = 'approved'
+            ORDER BY r.created_at DESC 
+            LIMIT %s OFFSET %s
+        """, (product_id, per_page, offset), fetch_all=True)
+        
+        # Get total count
+        count_result = execute_query("""
+            SELECT COUNT(*) as total FROM reviews 
+            WHERE product_id = %s AND status = 'approved'
+        """, (product_id,), fetch_one=True)
+        
+        total_reviews = count_result['total'] if count_result else 0
+        
+        # Format reviews
+        for review in reviews:
+            if review['created_at']:
+                review['created_at'] = review['created_at'].strftime('%B %d, %Y')
+        
+        return APIResponse.success({
+            'reviews': reviews,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total_reviews,
+                'pages': (total_reviews + per_page - 1) // per_page
+            }
+        })
+        
+    except Exception as e:
+        print(f"Get reviews error: {str(e)}")
+        return APIResponse.error('Failed to get reviews', 500)
+
+@user_bp.route('/reviews/<int:review_id>/helpful', methods=['POST'])
+@user_token_required
+def mark_review_helpful(user_id, review_id):
+    """Mark a review as helpful"""
+    try:
+        # Check if review exists
+        review = execute_query("""
+            SELECT review_id FROM reviews WHERE review_id = %s AND status = 'approved'
+        """, (review_id,), fetch_one=True)
+        
+        if not review:
+            return APIResponse.error('Review not found', 404)
+        
+        # Increment helpful count
+        execute_query("""
+            UPDATE reviews SET helpful_count = helpful_count + 1 
+            WHERE review_id = %s
+        """, (review_id,))
+        
+        return APIResponse.success({'message': 'Review marked as helpful'})
+        
+    except Exception as e:
+        print(f"Mark helpful error: {str(e)}")
+        return APIResponse.error('Failed to mark review as helpful', 500)

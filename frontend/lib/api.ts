@@ -474,5 +474,34 @@ export const ordersAPI = {
     return response.data
   },
 }
-// Default export
+export const reviewsAPI = {
+  // Submit a review for a product
+  submitReview: async (productId: string, reviewData: {
+    rating: number
+    title?: string
+    comment: string
+  }) => {
+    const response = await api.post(`/products/${productId}/reviews`, reviewData)
+    return response.data
+  },
+
+  // Get reviews for a product (with pagination)
+  getProductReviews: async (productId: string, params?: {
+    page?: number
+    per_page?: number
+  }) => {
+    const queryParams = new URLSearchParams()
+    if (params?.page) queryParams.append("page", params.page.toString())
+    if (params?.per_page) queryParams.append("per_page", params.per_page.toString())
+
+    const response = await api.get(`/products/${productId}/reviews${queryParams.toString() ? `?${queryParams.toString()}` : ""}`)
+    return response.data
+  },
+
+  // Mark a review as helpful
+  markHelpful: async (reviewId: number) => {
+    const response = await api.post(`/reviews/${reviewId}/helpful`)
+    return response.data
+  }
+}
 export default api
