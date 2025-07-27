@@ -1,4 +1,3 @@
-// Complete replacement for frontend/app/wishlist/page.tsx
 
 "use client"
 
@@ -29,6 +28,12 @@ export default function WishlistPage() {
   const { isAuthenticated } = useAuth()
   const { addItem } = useCartStore()
   const queryClient = useQueryClient()
+
+  // Helper function to safely format currency
+  const formatCurrency = (value: any) => {
+    const num = parseFloat(value) || 0
+    return `₹${num.toFixed(2)}`
+  }
 
   // Fetch real wishlist data from API
   const { data: wishlistData, isLoading, error, refetch } = useQuery({
@@ -68,7 +73,7 @@ export default function WishlistPage() {
         addItem({
           product_id: item.product_id,
           product_name: item.product_name || 'Product',
-          price: item.discount_price || item.price || 0,
+          price: parseFloat(item.discount_price) || parseFloat(item.price) || 0,
           quantity: 1,
           image_url: item.primary_image || '/placeholder.svg'
         })
@@ -216,17 +221,17 @@ export default function WishlistPage() {
                     <div className="mb-4">
                       <div className="flex items-center space-x-2">
                         <span className="text-lg font-bold text-emerald-600">
-                          ₹{((item.discount_price || item.price || 0)).toFixed(2)}
+                          {formatCurrency(item.discount_price || item.price)}
                         </span>
                         {item.discount_price && item.price && (
                           <span className="text-sm text-gray-500 line-through">
-                            ₹{item.price.toFixed(2)}
+                            {formatCurrency(item.price)}
                           </span>
                         )}
                       </div>
                       {item.discount_price && item.price && (
                         <p className="text-sm text-green-600">
-                          Save ₹{(item.price - item.discount_price).toFixed(2)}
+                          Save {formatCurrency((parseFloat(item.price) || 0) - (parseFloat(item.discount_price) || 0))}
                         </p>
                       )}
                     </div>

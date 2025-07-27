@@ -3,6 +3,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
+import { useEffect } from "react"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
@@ -41,6 +42,24 @@ export default function OrdersPage() {
   })
 
   const orders = ordersData?.orders || []
+
+  // DEBUG: Temporarily log the API response
+  useEffect(() => {
+    if (ordersData) {
+      console.log('=== ORDERS DEBUG ===')
+      console.log('Full API Response:', ordersData)
+      console.log('Orders Array:', ordersData.orders)
+      
+      if (ordersData.orders && ordersData.orders.length > 0) {
+        const firstOrder = ordersData.orders[0]
+        console.log('First Order:', firstOrder)
+        console.log('total_amount type:', typeof firstOrder.total_amount)
+        console.log('total_amount value:', firstOrder.total_amount)
+        console.log('formatCurrency test:', formatCurrency(firstOrder.total_amount))
+      }
+      console.log('===================')
+    }
+  }, [ordersData])
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -81,6 +100,12 @@ export default function OrdersPage() {
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  // Helper function to safely format currency
+  const formatCurrency = (value: any) => {
+    const num = parseFloat(value) || 0
+    return `₹${num.toFixed(2)}`
   }
 
   const formatDate = (dateString?: string) => {
@@ -201,7 +226,7 @@ export default function OrdersPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
                       <p className="text-sm text-gray-600">Total Amount</p>
-                      <p className="font-semibold">₹{(order.total_amount || 0).toFixed(2)}</p>
+                      <p className="font-semibold">{formatCurrency(order.total_amount)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Items</p>

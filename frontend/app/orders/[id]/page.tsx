@@ -101,6 +101,12 @@ export default function OrderDetailPage() {
     }
   }
 
+  // Helper function to safely format currency
+  const formatCurrency = (value: any) => {
+    const num = parseFloat(value) || 0
+    return `₹${num.toFixed(2)}`
+  }
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Date not available'
     
@@ -245,10 +251,10 @@ export default function OrderDetailPage() {
                       <div className="flex-1">
                         <h3 className="font-medium">{item.product_name || 'Product'}</h3>
                         <p className="text-sm text-gray-600">Quantity: {item.quantity || 0}</p>
-                        <p className="text-sm text-gray-600">Price: ₹{(item.unit_price || 0).toFixed(2)} each</p>
+                        <p className="text-sm text-gray-600">Price: {formatCurrency(item.unit_price)} each</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">₹{(item.total_price || 0).toFixed(2)}</p>
+                        <p className="font-semibold">{formatCurrency(item.total_price)}</p>
                       </div>
                     </div>
                   )) || (
@@ -334,20 +340,20 @@ export default function OrderDetailPage() {
 
                 <div className="flex justify-between text-sm">
                   <span>Subtotal</span>
-                  <span>₹{(order.subtotal || 0).toFixed(2)}</span>
+                  <span>{formatCurrency(order.subtotal)}</span>
                 </div>
 
-                {(order.shipping_amount || 0) > 0 && (
+                {(parseFloat(order.shipping_amount) || 0) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span>Shipping</span>
-                    <span>₹{(order.shipping_amount || 0).toFixed(2)}</span>
+                    <span>{formatCurrency(order.shipping_amount)}</span>
                   </div>
                 )}
 
-                {(order.tax_amount || 0) > 0 && (
+                {(parseFloat(order.tax_amount) || 0) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span>Tax</span>
-                    <span>₹{(order.tax_amount || 0).toFixed(2)}</span>
+                    <span>{formatCurrency(order.tax_amount)}</span>
                   </div>
                 )}
 
@@ -355,7 +361,7 @@ export default function OrderDetailPage() {
 
                 <div className="flex justify-between font-semibold">
                   <span>Total</span>
-                  <span>₹{(order.total_amount || 0).toFixed(2)}</span>
+                  <span>{formatCurrency(order.total_amount)}</span>
                 </div>
 
                 <div className="pt-4 space-y-2 text-sm text-gray-600">
