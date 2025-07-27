@@ -268,6 +268,8 @@ def get_products():
     
     return jsonify(response_data), 200
 
+# REPLACE THIS FUNCTION in backend/user/routes.py (around line 200-220)
+
 @user_bp.route('/products/featured', methods=['GET'])
 def get_featured_products():
     cache_key = 'user_featured_products'
@@ -275,26 +277,47 @@ def get_featured_products():
     if cached_data:
         return jsonify({'products': cached_data, 'cached': True}), 200
     
+    # FIXED: Added stock_quantity and better data structure
     products = execute_query("""
         SELECT p.product_id, p.product_name, p.price, p.discount_price, p.brand,
+               c.category_name,
                (SELECT pi.image_url FROM product_images pi 
                 WHERE pi.product_id = p.product_id AND pi.is_primary = 1 
-                LIMIT 1) as primary_image
+                LIMIT 1) as primary_image,
+               (SELECT i.quantity FROM inventory i 
+                WHERE i.product_id = p.product_id) as stock_quantity
         FROM products p 
+        LEFT JOIN categories c ON p.category_id = c.category_id
         WHERE p.is_featured = 1 AND p.status = 'active'
         ORDER BY p.created_at DESC 
         LIMIT 8
     """, fetch_all=True)
     
+    # ENHANCED: Process each product with stock and savings info
     for product in products:
+        # Calculate in_stock based on stock_quantity (auto out-of-stock when 0)
+        stock_quantity = product.get('stock_quantity') or 0
+        product['in_stock'] = stock_quantity > 0
+        
+        # Calculate savings if discount exists
         if product.get('discount_price') and product.get('price'):
-            product['savings'] = round(float(product['price']) - float(product['discount_price']), 2)
+            discount_price = float(product['discount_price'])
+            price = float(product['price'])
+            if price > discount_price:
+                product['savings'] = round(price - discount_price, 2)
+            else:
+                product['savings'] = 0
         else:
             product['savings'] = 0
+        
+        # Ensure category_name exists
+        if not product.get('category_name'):
+            product['category_name'] = ''
     
     # Convert image URLs to absolute URLs
     products = convert_products_images(products)
     
+    # Cache for 10 minutes
     current_app.cache.set(cache_key, products, timeout=600)
     return jsonify({'products': products, 'cached': False}), 200
 
