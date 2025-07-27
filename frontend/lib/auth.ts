@@ -31,6 +31,10 @@ interface AuthState {
   adminToken: string | null
   isAdminAuthenticated: boolean
 
+  // Hydration state
+  hasHydrated: boolean
+  setHasHydrated: () => void
+
   // Actions
   login: (token: string, user: User) => void
   logout: () => void
@@ -40,7 +44,7 @@ interface AuthState {
 
 const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       // Initial state
       user: null,
       token: null,
@@ -48,6 +52,10 @@ const useAuthStore = create<AuthState>()(
       admin: null,
       adminToken: null,
       isAdminAuthenticated: false,
+      hasHydrated: false,
+
+      // Hydration
+      setHasHydrated: () => set({ hasHydrated: true }),
 
       // User actions
       login: (token: string, user: User) => {
@@ -109,37 +117,62 @@ const useAuthStore = create<AuthState>()(
         adminToken: state.adminToken,
         isAdminAuthenticated: state.isAdminAuthenticated,
       }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated()
+      },
     },
   ),
 )
 
-// Main auth hook
+// Main auth hook with hydration protection
 export const useAuth = () => {
-  return useAuthStore()
+  const authState = useAuthStore()
+  
+  // Return safe defaults until hydrated
+  if (!authState.hasHydrated) {
+    return {
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      admin: null,
+      adminToken: null,
+      isAdminAuthenticated: false,
+      hasHydrated: false,
+      login: authState.login,
+      logout: authState.logout,
+      adminLogin: authState.adminLogin,
+      adminLogout: authState.adminLogout,
+      setHasHydrated: authState.setHasHydrated,
+    }
+  }
+
+  return authState
 }
 
 // Helper hook for admin authentication
 export const useAdminAuth = () => {
-  const { admin, adminToken, isAdminAuthenticated, adminLogin, adminLogout } = useAuthStore()
+  const { admin, adminToken, isAdminAuthenticated, adminLogin, adminLogout, hasHydrated } = useAuth()
 
   return {
-    admin,
-    token: adminToken,
-    isAuthenticated: isAdminAuthenticated,
+    admin: hasHydrated ? admin : null,
+    token: hasHydrated ? adminToken : null,
+    isAuthenticated: hasHydrated ? isAdminAuthenticated : false,
     login: adminLogin,
     logout: adminLogout,
+    hasHydrated,
   }
 }
 
 // Helper hook for user authentication
 export const useUserAuth = () => {
-  const { user, token, isAuthenticated, login, logout } = useAuthStore()
+  const { user, token, isAuthenticated, login, logout, hasHydrated } = useAuth()
 
   return {
-    user,
-    token,
-    isAuthenticated,
+    user: hasHydrated ? user : null,
+    token: hasHydrated ? token : null,
+    isAuthenticated: hasHydrated ? isAuthenticated : false,
     login,
     logout,
+    hasHydrated,
   }
 }

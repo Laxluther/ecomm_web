@@ -167,29 +167,13 @@ export const productsAPI = {
 }
 
 // Categories
-
 export const categoriesAPI = {
   getAll: async () => {
-    try {
-      console.log("categoriesAPI.getAll: Making request to /public/categories")
-      const response = await publicApi.get("/public/categories")  
-      console.log("categoriesAPI.getAll: Response data:", response.data)
-      
-      // Backend returns: { categories: [...] }
-      // Frontend expects: categoriesData.categories
-      if (response.data && response.data.categories) {
-        console.log("categoriesAPI.getAll: Found", response.data.categories.length, "categories")
-        return response.data  // Return full object so frontend can access .categories
-      } else {
-        console.warn("categoriesAPI.getAll: No categories in response, returning empty")
-        return { categories: [] }
-      }
-    } catch (error) {
-      console.error("categoriesAPI.getAll: Error fetching categories:", error)
-      throw error
-    }
+    const response = await publicApi.get("/public/categories")  
+    return response.data
   },
 }
+
 // Cart
 export const cartAPI = {
   get: async () => {
@@ -434,74 +418,6 @@ export const adminReferralsAPI = {
     return response.data
   },
 }
-// Orders API - ADD THIS SECTION
-export const ordersAPI = {
-  getAll: async () => {
-    const response = await api.get("/orders")
-    return response.data
-  },
 
-  create: async (orderData: {
-    items: Array<{
-      product_id: number
-      product_name: string
-      quantity: number
-      price: number
-    }>
-    shipping_address: {
-      name: string
-      phone: string
-      address_line_1: string
-      address_line_2?: string
-      city: string
-      state: string
-      pincode: string
-      landmark?: string
-      type: string
-    }
-    payment_method: string
-    subtotal: number
-    shipping_amount: number
-    tax_amount: number
-    total_amount: number
-  }) => {
-    const response = await api.post("/orders", orderData)
-    return response.data
-  },
-
-  getById: async (id: string) => {
-    const response = await api.get(`/orders/${id}`)
-    return response.data
-  },
-}
-export const reviewsAPI = {
-  // Submit a review for a product
-  submitReview: async (productId: string, reviewData: {
-    rating: number
-    title?: string
-    comment: string
-  }) => {
-    const response = await api.post(`/products/${productId}/reviews`, reviewData)
-    return response.data
-  },
-
-  // Get reviews for a product (with pagination)
-  getProductReviews: async (productId: string, params?: {
-    page?: number
-    per_page?: number
-  }) => {
-    const queryParams = new URLSearchParams()
-    if (params?.page) queryParams.append("page", params.page.toString())
-    if (params?.per_page) queryParams.append("per_page", params.per_page.toString())
-
-    const response = await api.get(`/products/${productId}/reviews${queryParams.toString() ? `?${queryParams.toString()}` : ""}`)
-    return response.data
-  },
-
-  // Mark a review as helpful
-  markHelpful: async (reviewId: number) => {
-    const response = await api.post(`/reviews/${reviewId}/helpful`)
-    return response.data
-  }
-}
+// Default export
 export default api
