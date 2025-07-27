@@ -1,3 +1,4 @@
+// COMPLETE REPLACEMENT for frontend/app/wishlist/page.tsx
 
 "use client"
 
@@ -16,9 +17,9 @@ import toast from "react-hot-toast"
 
 interface WishlistItem {
   product_id: number
-  product_name: string
-  price?: number
-  discount_price?: number | null
+  product_name?: string
+  price?: any
+  discount_price?: any
   primary_image?: string
   in_stock?: boolean
   brand?: string
@@ -29,10 +30,25 @@ export default function WishlistPage() {
   const { addItem } = useCartStore()
   const queryClient = useQueryClient()
 
-  // Helper function to safely format currency
-  const formatCurrency = (value: any) => {
-    const num = parseFloat(value) || 0
-    return `₹${num.toFixed(2)}`
+  // SAFE Helper function to format currency
+  const formatCurrency = (value: any): string => {
+    try {
+      const num = parseFloat(String(value || 0))
+      if (isNaN(num)) return "₹0.00"
+      return `₹${num.toFixed(2)}`
+    } catch (error) {
+      return "₹0.00"
+    }
+  }
+
+  // SAFE Helper to get numeric value
+  const getNumericValue = (value: any): number => {
+    try {
+      const num = parseFloat(String(value || 0))
+      return isNaN(num) ? 0 : num
+    } catch (error) {
+      return 0
+    }
   }
 
   // Fetch real wishlist data from API
@@ -70,10 +86,11 @@ export default function WishlistPage() {
       // Update local cart store
       const item = wishlistItems?.find(item => item.product_id === productId)
       if (item) {
+        const price = getNumericValue(item.discount_price) || getNumericValue(item.price)
         addItem({
           product_id: item.product_id,
           product_name: item.product_name || 'Product',
-          price: parseFloat(item.discount_price) || parseFloat(item.price) || 0,
+          price: price,
           quantity: 1,
           image_url: item.primary_image || '/placeholder.svg'
         })
@@ -97,6 +114,18 @@ export default function WishlistPage() {
       return
     }
     addToCartMutation.mutate(productId)
+  }
+
+  // SAFE calculation of savings
+  const calculateSavings = (price: any, discountPrice: any): string => {
+    const originalPrice = getNumericValue(price)
+    const salePrice = getNumericValue(discountPrice)
+    
+    if (originalPrice > 0 && salePrice > 0 && originalPrice > salePrice) {
+      const savings = originalPrice - salePrice
+      return formatCurrency(savings)
+    }
+    return formatCurrency(0)
   }
 
   if (!isAuthenticated) {
@@ -180,87 +209,93 @@ export default function WishlistPage() {
         ) : (
           // Wishlist items
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {wishlistItems.map((item) => (
-              <Card key={item.product_id} className="group hover:shadow-lg transition-shadow">
-                <CardContent className="p-0">
-                  {/* Product Image */}
-                  <div className="relative aspect-square overflow-hidden rounded-t-lg">
-                    <Image
-                      src={item.primary_image || "/placeholder.svg?height=300&width=300"}
-                      alt={item.product_name}
-                      fill
-                      className="object-cover group-hover:scale-105 transition-transform"
-                    />
-                    <button
-                      onClick={() => handleRemoveFromWishlist(item.product_id)}
-                      disabled={removeFromWishlistMutation.isPending}
-                      className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </button>
-                    {(item.in_stock === false) && (
-                      <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                        <span className="text-white font-semibold">Out of Stock</span>
-                      </div>
-                    )}
-                  </div>
-
-                                      {/* Product Info */}
-                  <div className="p-4">
-                    <div className="mb-2">
-                      <p className="text-sm text-gray-600">{item.brand || 'Unknown Brand'}</p>
-                      <Link 
-                        href={`/product/${item.product_id}`}
-                        className="font-medium text-gray-900 hover:text-emerald-600 transition-colors line-clamp-2"
+            {wishlistItems.map((item) => {
+              const hasDiscount = getNumericValue(item.discount_price) > 0 && 
+                                 getNumericValue(item.price) > getNumericValue(item.discount_price)
+              const displayPrice = hasDiscount ? item.discount_price : item.price
+              
+              return (
+                <Card key={item.product_id} className="group hover:shadow-lg transition-shadow">
+                  <CardContent className="p-0">
+                    {/* Product Image */}
+                    <div className="relative aspect-square overflow-hidden rounded-t-lg">
+                      <Image
+                        src={item.primary_image || "/placeholder.svg?height=300&width=300"}
+                        alt={item.product_name || "Product"}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform"
+                      />
+                      <button
+                        onClick={() => handleRemoveFromWishlist(item.product_id)}
+                        disabled={removeFromWishlistMutation.isPending}
+                        className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors"
                       >
-                        {item.product_name || 'Product Name'}
-                      </Link>
-                    </div>
-
-                    {/* Price */}
-                    <div className="mb-4">
-                      <div className="flex items-center space-x-2">
-                        <span className="text-lg font-bold text-emerald-600">
-                          {formatCurrency(item.discount_price || item.price)}
-                        </span>
-                        {item.discount_price && item.price && (
-                          <span className="text-sm text-gray-500 line-through">
-                            {formatCurrency(item.price)}
-                          </span>
-                        )}
-                      </div>
-                      {item.discount_price && item.price && (
-                        <p className="text-sm text-green-600">
-                          Save {formatCurrency((parseFloat(item.price) || 0) - (parseFloat(item.discount_price) || 0))}
-                        </p>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </button>
+                      {item.in_stock === false && (
+                        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                          <span className="text-white font-semibold">Out of Stock</span>
+                        </div>
                       )}
                     </div>
 
-                    {/* Actions */}
-                    <div className="space-y-2">
-                      <Button
-                        onClick={() => handleAddToCart(item.product_id, item)}
-                        disabled={item.in_stock === false || addToCartMutation.isPending}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700"
-                      >
-                        <ShoppingCart className="h-4 w-4 mr-2" />
-                        {item.in_stock === false ? "Out of Stock" : "Add to Cart"}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        asChild
-                        className="w-full"
-                      >
-                        <Link href={`/product/${item.product_id}`}>
-                          View Details
+                    {/* Product Info */}
+                    <div className="p-4">
+                      <div className="mb-2">
+                        <p className="text-sm text-gray-600">{item.brand || 'Unknown Brand'}</p>
+                        <Link 
+                          href={`/product/${item.product_id}`}
+                          className="font-medium text-gray-900 hover:text-emerald-600 transition-colors line-clamp-2"
+                        >
+                          {item.product_name || 'Product Name'}
                         </Link>
-                      </Button>
+                      </div>
+
+                      {/* Price - COMPLETELY SAFE */}
+                      <div className="mb-4">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-lg font-bold text-emerald-600">
+                            {formatCurrency(displayPrice)}
+                          </span>
+                          {hasDiscount && (
+                            <span className="text-sm text-gray-500 line-through">
+                              {formatCurrency(item.price)}
+                            </span>
+                          )}
+                        </div>
+                        {hasDiscount && (
+                          <p className="text-sm text-green-600">
+                            Save {calculateSavings(item.price, item.discount_price)}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="space-y-2">
+                        <Button
+                          onClick={() => handleAddToCart(item.product_id, item)}
+                          disabled={item.in_stock === false || addToCartMutation.isPending}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          <ShoppingCart className="h-4 w-4 mr-2" />
+                          {item.in_stock === false ? "Out of Stock" : "Add to Cart"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          asChild
+                          className="w-full"
+                        >
+                          <Link href={`/product/${item.product_id}`}>
+                            View Details
+                          </Link>
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
           </div>
         )}
 

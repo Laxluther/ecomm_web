@@ -1,4 +1,4 @@
-// Complete replacement for frontend/app/orders/[id]/page.tsx
+// COMPLETE REPLACEMENT for frontend/app/orders/[id]/page.tsx
 
 "use client"
 
@@ -20,19 +20,19 @@ import toast from "react-hot-toast"
 interface OrderItem {
   product_id?: number
   product_name?: string
-  quantity?: number
-  unit_price?: number
-  total_price?: number
+  quantity?: any
+  unit_price?: any
+  total_price?: any
 }
 
 interface OrderDetails {
   order_id: string
   order_number?: string
   status: string
-  subtotal?: number
-  shipping_amount?: number
-  tax_amount?: number
-  total_amount?: number
+  subtotal?: any
+  shipping_amount?: any
+  tax_amount?: any
+  total_amount?: any
   payment_method?: string
   payment_status?: string
   shipping_address?: any
@@ -46,6 +46,44 @@ export default function OrderDetailPage() {
   const router = useRouter()
   const orderId = params.id as string
   const { isAuthenticated } = useAuth()
+
+  // SAFE Helper function to format currency
+  const formatCurrency = (value: any): string => {
+    try {
+      const num = parseFloat(String(value || 0))
+      if (isNaN(num)) return "₹0.00"
+      return `₹${num.toFixed(2)}`
+    } catch (error) {
+      return "₹0.00"
+    }
+  }
+
+  // SAFE Helper to get numeric value
+  const getNumericValue = (value: any): number => {
+    try {
+      const num = parseFloat(String(value || 0))
+      return isNaN(num) ? 0 : num
+    } catch (error) {
+      return 0
+    }
+  }
+
+  // SAFE date formatter
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return 'Date not available'
+    
+    try {
+      return new Date(dateString).toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch (error) {
+      return 'Invalid date'
+    }
+  }
 
   // Fetch real order details from API
   const { data: orderData, isLoading, error, refetch } = useQuery({
@@ -98,28 +136,6 @@ export default function OrderDetailPage() {
         return "bg-gray-100 text-gray-800"
       default:
         return "bg-gray-100 text-gray-800"
-    }
-  }
-
-  // Helper function to safely format currency
-  const formatCurrency = (value: any) => {
-    const num = parseFloat(value) || 0
-    return `₹${num.toFixed(2)}`
-  }
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'Date not available'
-    
-    try {
-      return new Date(dateString).toLocaleDateString('en-IN', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })
-    } catch (error) {
-      return 'Invalid date'
     }
   }
 
@@ -215,8 +231,14 @@ export default function OrderDetailPage() {
 
   const timeline = getOrderTimeline(order.status, order.created_at, order.updated_at)
   const shippingAddress = typeof order.shipping_address === 'string' 
-    ? JSON.parse(order.shipping_address) 
-    : order.shipping_address
+    ? (() => {
+        try {
+          return JSON.parse(order.shipping_address)
+        } catch {
+          return {}
+        }
+      })()
+    : (order.shipping_address || {})
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -230,7 +252,9 @@ export default function OrderDetailPage() {
               Back to Orders
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Order #{order.order_number || order.order_id}</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Order #{order.order_number || order.order_id}
+          </h1>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -243,21 +267,23 @@ export default function OrderDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {order.items?.map((item, index) => (
-                    <div key={index} className="flex items-center space-x-4 py-4 border-b last:border-b-0">
-                      <div className="w-16 h-16 bg-gray-100 rounded-md flex items-center justify-center">
-                        <Package className="h-6 w-6 text-gray-400" />
+                  {order.items && order.items.length > 0 ? (
+                    order.items.map((item, index) => (
+                      <div key={index} className="flex items-center space-x-4 py-4 border-b last:border-b-0">
+                        <div className="w-16 h-16 bg-gray-100 rounded-md flex items-center justify-center">
+                          <Package className="h-6 w-6 text-gray-400" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-medium">{item.product_name || 'Product'}</h3>
+                          <p className="text-sm text-gray-600">Quantity: {getNumericValue(item.quantity) || 0}</p>
+                          <p className="text-sm text-gray-600">Price: {formatCurrency(item.unit_price)} each</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">{formatCurrency(item.total_price)}</p>
+                        </div>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium">{item.product_name || 'Product'}</h3>
-                        <p className="text-sm text-gray-600">Quantity: {item.quantity || 0}</p>
-                        <p className="text-sm text-gray-600">Price: {formatCurrency(item.unit_price)} each</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(item.total_price)}</p>
-                      </div>
-                    </div>
-                  )) || (
+                    ))
+                  ) : (
                     <p className="text-gray-500 text-center py-4">No items found</p>
                   )}
                 </div>
@@ -302,7 +328,7 @@ export default function OrderDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  <p className="font-medium">{shippingAddress?.name}</p>
+                  <p className="font-medium">{shippingAddress?.name || 'No name provided'}</p>
                   {shippingAddress?.phone && (
                     <p className="text-sm text-gray-600 flex items-center gap-2">
                       <Phone className="h-4 w-4" />
@@ -310,9 +336,9 @@ export default function OrderDetailPage() {
                     </p>
                   )}
                   <div className="text-sm text-gray-600">
-                    <p>{shippingAddress?.address_line_1}</p>
+                    <p>{shippingAddress?.address_line_1 || 'Address not available'}</p>
                     {shippingAddress?.address_line_2 && <p>{shippingAddress.address_line_2}</p>}
-                    <p>{shippingAddress?.city}, {shippingAddress?.state} {shippingAddress?.pincode}</p>
+                    <p>{shippingAddress?.city || 'City'}, {shippingAddress?.state || 'State'} {shippingAddress?.pincode || 'Pincode'}</p>
                     {shippingAddress?.landmark && <p>Landmark: {shippingAddress.landmark}</p>}
                   </div>
                 </div>
@@ -343,14 +369,14 @@ export default function OrderDetailPage() {
                   <span>{formatCurrency(order.subtotal)}</span>
                 </div>
 
-                {(parseFloat(order.shipping_amount) || 0) > 0 && (
+                {getNumericValue(order.shipping_amount) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span>Shipping</span>
                     <span>{formatCurrency(order.shipping_amount)}</span>
                   </div>
                 )}
 
-                {(parseFloat(order.tax_amount) || 0) > 0 && (
+                {getNumericValue(order.tax_amount) > 0 && (
                   <div className="flex justify-between text-sm">
                     <span>Tax</span>
                     <span>{formatCurrency(order.tax_amount)}</span>
