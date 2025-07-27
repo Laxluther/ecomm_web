@@ -820,6 +820,63 @@ def get_wallet(user_id):
         'wallet': wallet,
         'transactions': transactions
     }), 200
+@user_bp.route('/orders/<string:order_id>', methods=['GET'])
+@user_token_required
+def get_order_details(user_id, order_id):
+    """Get detailed information for a specific order"""
     
+    # Get order details
+    order = execute_query("""
+        SELECT o.*, 
+               CONCAT(u.first_name, ' ', u.last_name) as customer_name,
+               u.email as customer_email
+        FROM orders o
+        JOIN users u ON o.user_id = u.user_id
+        WHERE o.order_id = %s AND o.user_id = %s
+    """, (order_id, user_id), fetch_one=True)
+    
+    if not order:
+        return APIResponse.error('Order not found', 404)
+    
+    # Get order items
+    order_items = execute_query("""
+        SELECT oi.*, p.brand,
+               (SELECT pi.image_url FROM product_images pi 
+                WHERE pi.product_id = oi.product_id AND pi.is_primary = 1 
+                LIMIT 1) as product_image
+        FROM order_items oi
+        LEFT JOIN products p ON oi.product_id = p.product_id
+        WHERE oi.order_id = %s
+        ORDER BY oi.created_at
+    """, (order_id,), fetch_all=True)
+    
+    # Convert image URLs to absolute URLs
+    for item in order_items:
+        item['product_image'] = convert_image_url(item['product_image'])
+    
+    # Parse shipping address if it's JSON string
+    if isinstance(order['shipping_address'], str):
+        try:
+            order['shipping_address'] = json.loads(order['shipping_address'])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    # Parse billing address if it exists and is JSON string
+    if order.get('billing_address') and isinstance(order['billing_address'], str):
+        try:
+            order['billing_address'] = json.loads(order['billing_address'])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    # Format the response
+    order_details = {
+        **order,
+        'items': order_items,
+        'total_items': len(order_items),
+        'created_at': order['created_at'].isoformat() if order['created_at'] else None,
+        'updated_at': order['updated_at'].isoformat() if order['updated_at'] else None,
+    }
+    
+    return APIResponse.success({'order': order_details}, 'Order details retrieved successfully')
 
 

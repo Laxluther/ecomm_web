@@ -1,116 +1,234 @@
+// Complete replacement for frontend/app/orders/[id]/page.tsx
+
 "use client"
 
-import { useState } from "react"
-import { useParams } from "next/navigation"
+import { useQuery } from "@tanstack/react-query"
+import { useParams, useRouter } from "next/navigation"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Package, Truck, CheckCircle, Clock, ArrowLeft, MapPin, Phone, Mail } from "lucide-react"
+import { Package, Truck, CheckCircle, Clock, ArrowLeft, MapPin, Phone, Mail, AlertCircle } from "lucide-react"
+import { ordersAPI } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 import Link from "next/link"
 import Image from "next/image"
+import toast from "react-hot-toast"
+
+interface OrderItem {
+  product_id?: number
+  product_name?: string
+  quantity?: number
+  unit_price?: number
+  total_price?: number
+}
+
+interface OrderDetails {
+  order_id: string
+  order_number?: string
+  status: string
+  subtotal?: number
+  shipping_amount?: number
+  tax_amount?: number
+  total_amount?: number
+  payment_method?: string
+  payment_status?: string
+  shipping_address?: any
+  created_at: string
+  updated_at?: string
+  items?: OrderItem[]
+}
 
 export default function OrderDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const orderId = params.id as string
+  const { isAuthenticated } = useAuth()
 
-  const [order] = useState({
-    order_id: orderId,
-    order_date: "2024-01-15",
-    status: "shipped",
-    total: 1299,
-    subtotal: 1098,
-    shipping: 0,
-    tax: 201,
-    payment_method: "COD",
-    shipping_address: {
-      name: "John Doe",
-      phone: "+91 98765 43210",
-      email: "john@example.com",
-      address: "123 Main Street, Apartment 4B",
-      city: "Mumbai",
-      state: "Maharashtra",
-      pincode: "400001",
+  // Fetch real order details from API
+  const { data: orderData, isLoading, error, refetch } = useQuery({
+    queryKey: ["order-details", orderId],
+    queryFn: async () => {
+      const response = await ordersAPI.getById(orderId)
+      return response
     },
-    items: [
-      {
-        product_id: 1,
-        product_name: "Raw Forest Honey",
-        quantity: 2,
-        price: 549,
-        image_url: "/placeholder.svg?height=80&width=80",
-      },
-    ],
-    tracking: [
-      {
-        status: "Order Placed",
-        date: "2024-01-15 10:30 AM",
-        description: "Your order has been placed successfully",
-        completed: true,
-      },
-      {
-        status: "Order Confirmed",
-        date: "2024-01-15 02:15 PM",
-        description: "Your order has been confirmed and is being prepared",
-        completed: true,
-      },
-      {
-        status: "Shipped",
-        date: "2024-01-16 09:00 AM",
-        description: "Your order has been shipped via Express Delivery",
-        completed: true,
-      },
-      {
-        status: "Out for Delivery",
-        date: "Expected: 2024-01-17 11:00 AM",
-        description: "Your order is out for delivery",
-        completed: false,
-      },
-      {
-        status: "Delivered",
-        date: "Expected: 2024-01-17 06:00 PM",
-        description: "Your order will be delivered",
-        completed: false,
-      },
-    ],
+    enabled: isAuthenticated && !!orderId,
+    retry: 2,
   })
 
+  const order: OrderDetails | undefined = orderData?.order
+
   const getStatusIcon = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "order placed":
-        return <Clock className="h-4 w-4" />
-      case "order confirmed":
-        return <CheckCircle className="h-4 w-4" />
+    switch (status) {
+      case "pending":
+        return <Clock className="h-5 w-5" />
+      case "confirmed":
+        return <CheckCircle className="h-5 w-5" />
+      case "processing":
+        return <Package className="h-5 w-5" />
       case "shipped":
-        return <Truck className="h-4 w-4" />
-      case "out for delivery":
-        return <Truck className="h-4 w-4" />
+        return <Truck className="h-5 w-5" />
       case "delivered":
-        return <Package className="h-4 w-4" />
+        return <CheckCircle className="h-5 w-5" />
+      case "cancelled":
+      case "refunded":
+        return <AlertCircle className="h-5 w-5" />
       default:
-        return <Clock className="h-4 w-4" />
+        return <Clock className="h-5 w-5" />
     }
   }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800"
+      case "confirmed":
+        return "bg-blue-100 text-blue-800"
+      case "processing":
+        return "bg-purple-100 text-purple-800"
+      case "shipped":
+        return "bg-indigo-100 text-indigo-800"
+      case "delivered":
+        return "bg-green-100 text-green-800"
+      case "cancelled":
+        return "bg-red-100 text-red-800"
+      case "refunded":
+        return "bg-gray-100 text-gray-800"
+      default:
+        return "bg-gray-100 text-gray-800"
+    }
+  }
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'Date not available'
+    
+    try {
+      return new Date(dateString).toLocaleDateString('en-IN', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch (error) {
+      return 'Invalid date'
+    }
+  }
+
+  const getOrderTimeline = (status: string, createdAt: string, updatedAt?: string) => {
+    const baseSteps = [
+      { status: "Order Placed", date: createdAt, completed: true },
+      { status: "Order Confirmed", date: null, completed: ["confirmed", "processing", "shipped", "delivered"].includes(status) },
+      { status: "Processing", date: null, completed: ["processing", "shipped", "delivered"].includes(status) },
+      { status: "Shipped", date: null, completed: ["shipped", "delivered"].includes(status) },
+      { status: "Delivered", date: null, completed: status === "delivered" },
+    ]
+
+    if (status === "cancelled") {
+      return [
+        baseSteps[0],
+        { status: "Order Cancelled", date: updatedAt || null, completed: true }
+      ]
+    }
+
+    return baseSteps
+  }
+
+  if (!isAuthenticated) {
+    router.push('/login')
+    return null
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-64 mb-8"></div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="h-6 bg-gray-200 rounded mb-4"></div>
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="h-4 bg-gray-200 rounded"></div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              <div className="space-y-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="h-6 bg-gray-200 rounded mb-4"></div>
+                    <div className="space-y-3">
+                      {[...Array(4)].map((_, i) => (
+                        <div key={i} className="h-4 bg-gray-200 rounded"></div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
+
+  if (error || !order) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="text-center py-8">
+                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">Order Not Found</h2>
+                <p className="text-gray-600 mb-4">The order you're looking for doesn't exist or you don't have permission to view it.</p>
+                <div className="space-x-4">
+                  <Button onClick={() => refetch()}>Try Again</Button>
+                  <Button variant="outline" asChild>
+                    <Link href="/orders">Back to Orders</Link>
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
+
+  const timeline = getOrderTimeline(order.status, order.created_at, order.updated_at)
+  const shippingAddress = typeof order.shipping_address === 'string' 
+    ? JSON.parse(order.shipping_address) 
+    : order.shipping_address
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
 
       <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center mb-8">
-          <Button asChild variant="ghost" size="sm" className="mr-4">
+        <div className="flex items-center gap-4 mb-8">
+          <Button variant="outline" size="sm" asChild>
             <Link href="/orders">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Orders
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Order #{order.order_id}</h1>
+          <h1 className="text-3xl font-bold text-gray-900">Order #{order.order_number || order.order_id}</h1>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Order Details */}
+          {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Order Items */}
             <Card>
@@ -119,89 +237,51 @@ export default function OrderDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {order.items.map((item, index) => (
-                    <div key={index} className="flex items-center space-x-4">
-                      <div className="relative w-20 h-20 flex-shrink-0">
-                        <Image
-                          src={item.image_url || "/placeholder.svg"}
-                          alt={item.product_name}
-                          fill
-                          className="object-cover rounded-lg"
-                        />
+                  {order.items?.map((item, index) => (
+                    <div key={index} className="flex items-center space-x-4 py-4 border-b last:border-b-0">
+                      <div className="w-16 h-16 bg-gray-100 rounded-md flex items-center justify-center">
+                        <Package className="h-6 w-6 text-gray-400" />
                       </div>
                       <div className="flex-1">
-                        <h4 className="font-medium text-lg">{item.product_name}</h4>
-                        <p className="text-gray-500">Quantity: {item.quantity}</p>
-                        <p className="text-emerald-600 font-medium">₹{item.price} each</p>
+                        <h3 className="font-medium">{item.product_name || 'Product'}</h3>
+                        <p className="text-sm text-gray-600">Quantity: {item.quantity || 0}</p>
+                        <p className="text-sm text-gray-600">Price: ₹{(item.unit_price || 0).toFixed(2)} each</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xl font-bold">₹{(item.price * item.quantity).toFixed(0)}</p>
+                        <p className="font-semibold">₹{(item.total_price || 0).toFixed(2)}</p>
                       </div>
                     </div>
-                  ))}
+                  )) || (
+                    <p className="text-gray-500 text-center py-4">No items found</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Order Tracking */}
+            {/* Order Timeline */}
             <Card>
               <CardHeader>
-                <CardTitle>Order Tracking</CardTitle>
+                <CardTitle>Order Timeline</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  {order.tracking.map((track, index) => (
-                    <div key={index} className="flex items-start space-x-4">
-                      <div className={`p-2 rounded-full ${track.completed ? "bg-emerald-100" : "bg-gray-100"}`}>
-                        <div className={track.completed ? "text-emerald-600" : "text-gray-400"}>
-                          {getStatusIcon(track.status)}
-                        </div>
+                <div className="space-y-4">
+                  {timeline.map((step, index) => (
+                    <div key={index} className="flex items-center space-x-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        step.completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                      }`}>
+                        {step.completed ? <CheckCircle className="h-4 w-4" /> : <Clock className="h-4 w-4" />}
                       </div>
                       <div className="flex-1">
-                        <div className="flex items-center space-x-2">
-                          <h4 className={`font-medium ${track.completed ? "text-gray-900" : "text-gray-500"}`}>
-                            {track.status}
-                          </h4>
-                          {track.completed && <Badge className="bg-emerald-100 text-emerald-800">Completed</Badge>}
-                        </div>
-                        <p className="text-sm text-gray-500 mt-1">{track.date}</p>
-                        <p className="text-sm text-gray-600 mt-1">{track.description}</p>
+                        <p className={`font-medium ${step.completed ? 'text-gray-900' : 'text-gray-400'}`}>
+                          {step.status}
+                        </p>
+                        {step.date && (
+                          <p className="text-sm text-gray-600">{formatDate(step.date)}</p>
+                        )}
                       </div>
                     </div>
                   ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Order Summary & Shipping */}
-          <div className="space-y-6">
-            {/* Order Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span>Subtotal</span>
-                  <span>₹{order.subtotal}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Shipping</span>
-                  <span>{order.shipping === 0 ? "Free" : `₹${order.shipping}`}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Tax</span>
-                  <span>₹{order.tax}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between text-lg font-bold">
-                  <span>Total</span>
-                  <span className="text-emerald-600">₹{order.total}</span>
-                </div>
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm font-medium">Payment Method</p>
-                  <p className="text-sm text-gray-600">{order.payment_method}</p>
                 </div>
               </CardContent>
             </Card>
@@ -209,26 +289,79 @@ export default function OrderDetailPage() {
             {/* Shipping Address */}
             <Card>
               <CardHeader>
-                <CardTitle>Shipping Address</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Shipping Address
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <MapPin className="h-4 w-4 text-gray-400" />
-                  <div>
-                    <p className="font-medium">{order.shipping_address.name}</p>
-                    <p className="text-sm text-gray-600">{order.shipping_address.address}</p>
-                    <p className="text-sm text-gray-600">
-                      {order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.pincode}
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="font-medium">{shippingAddress?.name}</p>
+                  {shippingAddress?.phone && (
+                    <p className="text-sm text-gray-600 flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      {shippingAddress.phone}
                     </p>
+                  )}
+                  <div className="text-sm text-gray-600">
+                    <p>{shippingAddress?.address_line_1}</p>
+                    {shippingAddress?.address_line_2 && <p>{shippingAddress.address_line_2}</p>}
+                    <p>{shippingAddress?.city}, {shippingAddress?.state} {shippingAddress?.pincode}</p>
+                    {shippingAddress?.landmark && <p>Landmark: {shippingAddress.landmark}</p>}
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Phone className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">{order.shipping_address.phone}</span>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Order Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span>Status</span>
+                  <Badge className={getStatusColor(order.status)}>
+                    <div className="flex items-center gap-1">
+                      {getStatusIcon(order.status)}
+                      <span className="capitalize">{order.status}</span>
+                    </div>
+                  </Badge>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Mail className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm">{order.shipping_address.email}</span>
+
+                <div className="flex justify-between text-sm">
+                  <span>Subtotal</span>
+                  <span>₹{(order.subtotal || 0).toFixed(2)}</span>
+                </div>
+
+                {(order.shipping_amount || 0) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>Shipping</span>
+                    <span>₹{(order.shipping_amount || 0).toFixed(2)}</span>
+                  </div>
+                )}
+
+                {(order.tax_amount || 0) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>Tax</span>
+                    <span>₹{(order.tax_amount || 0).toFixed(2)}</span>
+                  </div>
+                )}
+
+                <Separator />
+
+                <div className="flex justify-between font-semibold">
+                  <span>Total</span>
+                  <span>₹{(order.total_amount || 0).toFixed(2)}</span>
+                </div>
+
+                <div className="pt-4 space-y-2 text-sm text-gray-600">
+                  <p><strong>Payment Method:</strong> {order.payment_method?.toUpperCase() || 'N/A'}</p>
+                  <p><strong>Payment Status:</strong> <span className="capitalize">{order.payment_status || 'pending'}</span></p>
+                  <p><strong>Order Date:</strong> {formatDate(order.created_at)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -237,15 +370,17 @@ export default function OrderDetailPage() {
             <Card>
               <CardContent className="pt-6">
                 <div className="space-y-3">
-                  <Button variant="outline" className="w-full">
+                  <Button className="w-full" variant="outline">
                     Download Invoice
                   </Button>
-                  <Button variant="outline" className="w-full">
+                  {order.status === "delivered" && (
+                    <Button className="w-full" variant="outline">
+                      Return/Exchange
+                    </Button>
+                  )}
+                  <Button className="w-full" variant="outline">
                     Contact Support
                   </Button>
-                  {order.status === "delivered" && (
-                    <Button className="w-full bg-emerald-600 hover:bg-emerald-700">Write Review</Button>
-                  )}
                 </div>
               </CardContent>
             </Card>
