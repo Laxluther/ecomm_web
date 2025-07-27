@@ -6,7 +6,7 @@ from shared.image_utils import convert_products_images, convert_product_images, 
 from datetime import datetime, timedelta
 import uuid
 import json
-
+from cache_utils import invalidate_product_cache
 user_bp = Blueprint('user', __name__)
 
 # Authentication Routes
@@ -775,10 +775,15 @@ def create_order(user_id):
             ))
             
             # Update inventory (reduce stock)
-            execute_query("""
-                UPDATE inventory SET quantity = quantity - %s 
-                WHERE product_id = %s AND quantity >= %s
-            """, (quantity, product_id, quantity))
+            # Update inventory (reduce stock)
+        execute_query("""
+            UPDATE inventory SET quantity = quantity - %s 
+            WHERE product_id = %s AND quantity >= %s
+        """, (quantity, product_id, quantity))
+
+        # INSTANT CACHE INVALIDATION for stock change
+        
+        invalidate_product_cache(product_id)
         
         # Clear the user's cart
         execute_query("""

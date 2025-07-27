@@ -482,3 +482,21 @@ WHERE rc.status = 'active';
 UPDATE users 
 SET referral_code = CONCAT('REF', UPPER(SUBSTRING(MD5(RAND()), 1, 8)))
 WHERE referral_code IS NULL;
+
+-- Speed up product queries
+CREATE INDEX idx_products_status_featured ON products(status, is_featured);
+CREATE INDEX idx_products_category_status ON products(category_id, status);
+
+-- Speed up inventory/stock queries  
+CREATE INDEX idx_inventory_product_quantity ON inventory(product_id, quantity);
+
+-- Speed up review queries
+CREATE INDEX idx_reviews_product_status_created ON reviews(product_id, status, created_at DESC);
+
+-- Speed up product images
+CREATE INDEX idx_product_images_product_primary ON product_images(product_id, is_primary, sort_order);
+
+
+SHOW INDEX FROM products;
+SHOW INDEX FROM reviews;
+SHOW INDEX FROM inventory;

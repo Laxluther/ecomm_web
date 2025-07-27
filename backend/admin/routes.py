@@ -4,7 +4,7 @@ from shared.auth import admin_token_required
 from shared.file_service import file_service
 from shared.image_utils import convert_products_images, convert_product_images, convert_image_url
 from datetime import datetime, timedelta
-
+from cache_utils import invalidate_product_cache
 admin_bp = Blueprint('admin', __name__)
 
 @admin_bp.route('/auth/login', methods=['POST'])
@@ -327,11 +327,16 @@ def update_product(admin_id, product_id):
     execute_query(query, params)
     
     # Update inventory if stock_quantity is provided
+    # Update inventory if stock_quantity is provided
     if 'stock_quantity' in data:
         execute_query("""
             UPDATE inventory SET quantity = %s 
             WHERE product_id = %s
         """, (data['stock_quantity'], product_id))
+
+    # INSTANT CACHE INVALIDATION
+    
+    invalidate_product_cache(product_id)
     
     # Clear cache
     current_app.cache.delete('featured_products')

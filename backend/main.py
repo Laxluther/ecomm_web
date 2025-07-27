@@ -2,6 +2,7 @@ from flask import Flask, send_from_directory
 from flask_cors import CORS
 from flask_caching import Cache
 from config import get_config
+from websocket_manager import WebSocketManager  # ADD THIS IMPORT
 import os
 
 def create_app():
@@ -20,6 +21,10 @@ def create_app():
     
     cache = Cache(app)
     app.cache = cache
+    
+    # ADD WEBSOCKET MANAGER
+    websocket_manager = WebSocketManager(app)
+    app.websocket_manager = websocket_manager
     
     from admin.routes import admin_bp
     from user.routes import user_bp
@@ -45,8 +50,13 @@ def create_app():
     def health_check():
         return {'status': 'healthy', 'message': 'E-commerce API is running'}, 200
     
+    # ADD WEBSOCKET STATUS ENDPOINT
+    @app.route('/websocket/status')
+    def websocket_status():
+        return app.websocket_manager.get_status(), 200
+    
     return app
 
 if __name__ == '__main__':
     app = create_app()
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.websocket_manager.socketio.run(app, debug=True, host='0.0.0.0', port=5000)
