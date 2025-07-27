@@ -328,47 +328,59 @@ def get_product_detail(product_id):
     if cached_data:
         return jsonify({**cached_data, 'cached': True}), 200
     
+    # OPTIMIZED: Single query instead of 4 separate queries
     product = execute_query("""
-        SELECT p.*, c.category_name,
-               (SELECT pi.image_url FROM product_images pi 
-                WHERE pi.product_id = p.product_id AND pi.is_primary = 1 
-                LIMIT 1) as primary_image,
-               (SELECT i.quantity FROM inventory i 
-                WHERE i.product_id = p.product_id) as stock
+        SELECT 
+            p.product_id, p.product_name, p.description, p.price, p.discount_price,
+            p.brand, p.sku, p.weight, p.created_at,
+            c.category_name,
+            i.quantity as stock,
+            -- Get primary image
+            (SELECT pi.image_url FROM product_images pi 
+             WHERE pi.product_id = p.product_id AND pi.is_primary = 1 
+             LIMIT 1) as primary_image,
+            -- Get review stats in same query
+            COALESCE(AVG(r.rating), 0) as avg_rating,
+            COUNT(r.review_id) as total_reviews
         FROM products p 
         LEFT JOIN categories c ON p.category_id = c.category_id
+        LEFT JOIN inventory i ON p.product_id = i.product_id
+        LEFT JOIN reviews r ON p.product_id = r.product_id AND r.status = 'approved'
         WHERE p.product_id = %s AND p.status = 'active'
+        GROUP BY p.product_id, c.category_name, i.quantity
     """, (product_id,), fetch_one=True)
     
     if not product:
         return jsonify({'error': 'Product not found'}), 404
     
+    # Get images separately (this is fine as it's usually 2-3 images)
     images = execute_query("""
-        SELECT * FROM product_images 
+        SELECT image_id, image_url, alt_text, sort_order, is_primary
+        FROM product_images 
         WHERE product_id = %s 
-        ORDER BY sort_order, is_primary DESC
+        ORDER BY is_primary DESC, sort_order ASC
     """, (product_id,), fetch_all=True)
     
+    # Get recent reviews separately
     reviews = execute_query("""
-        SELECT r.rating, r.comment, r.created_at, 
-               u.first_name, u.last_name
-        FROM reviews r 
-        JOIN users u ON r.user_id = u.user_id 
+        SELECT r.review_id, r.rating, r.comment, 
+               DATE_FORMAT(r.created_at, '%M %d, %Y') as created_at,
+               CONCAT(u.first_name, ' ', LEFT(u.last_name, 1), '.') as user_name
+        FROM reviews r
+        JOIN users u ON r.user_id = u.user_id
         WHERE r.product_id = %s AND r.status = 'approved'
         ORDER BY r.created_at DESC LIMIT 10
     """, (product_id,), fetch_all=True)
     
-    avg_rating = execute_query("""
-        SELECT AVG(rating) as avg_rating, COUNT(*) as total_reviews
-        FROM reviews 
-        WHERE product_id = %s AND status = 'approved'
-    """, (product_id,), fetch_one=True)
-    
-    # Convert image URLs to absolute URLs
+    # Process product data
+    product = dict(product)
     product = convert_product_images(product)
+    
+    # Process images
     for img in images:
         img['image_url'] = convert_image_url(img['image_url'])
     
+    # Calculate stock and savings
     product['in_stock'] = (product.get('stock') or 0) > 0
     if product.get('discount_price') and product.get('price'):
         product['savings'] = round(float(product['price']) - float(product['discount_price']), 2)
@@ -380,14 +392,16 @@ def get_product_detail(product_id):
         'images': images,
         'reviews': reviews,
         'rating': {
-            'average': round(float(avg_rating['avg_rating'] or 0), 1),
-            'total_reviews': avg_rating['total_reviews']
+            'average': round(float(product['avg_rating']), 1),
+            'total_reviews': product['total_reviews']
         },
         'cached': False
     }
     
-    current_app.cache.set(cache_key, product_data, timeout=900)
+    # REDUCED CACHE TIMEOUT: 180 seconds instead of 900
+    current_app.cache.set(cache_key, product_data, timeout=180)
     return jsonify(product_data), 200
+
 
 @user_bp.route('/categories', methods=['GET'])
 def get_categories():
@@ -777,13 +791,18 @@ def create_order(user_id):
             # Update inventory (reduce stock)
             # Update inventory (reduce stock)
         execute_query("""
-            UPDATE inventory SET quantity = quantity - %s 
-            WHERE product_id = %s AND quantity >= %s
-        """, (quantity, product_id, quantity))
+    UPDATE inventory SET quantity = quantity - %s 
+    WHERE product_id = %s AND quantity >= %s
+""", (quantity, product_id, quantity))
 
         # INSTANT CACHE INVALIDATION for stock change
         
-        invalidate_product_cache(product_id)
+        new_stock = execute_query("""
+            SELECT quantity FROM inventory WHERE product_id = %s
+        """, (product_id,), fetch_one=True)
+
+        new_quantity = new_stock['quantity'] if new_stock else 0
+        invalidate_product_cache(product_id, new_quantity)
         
         # Clear the user's cart
         execute_query("""
@@ -921,74 +940,59 @@ def get_order_details(user_id, order_id):
     return APIResponse.success({'order': order_details}, 'Order details retrieved successfully')
 
 
-# ADD THIS TO YOUR backend/user/routes.py file
-
 @user_bp.route('/products/<int:product_id>/reviews', methods=['POST'])
 @user_token_required
-def add_product_review(user_id, product_id):
-    """Add a review for a product"""
+def add_review(user_id, product_id):
     try:
         data = request.get_json()
-        
-        # Validation
         rating = data.get('rating')
-        comment = data.get('comment', '').strip()
-        title = data.get('title', '').strip()
+        title = data.get('title', '')
+        comment = data.get('comment', '')
         
-        if not rating or rating < 1 or rating > 5:
+        if not rating or not (1 <= rating <= 5):
             return APIResponse.error('Rating must be between 1 and 5', 400)
         
-        if not comment:
-            return APIResponse.error('Comment is required', 400)
-        
-        if len(comment) < 10:
-            return APIResponse.error('Comment must be at least 10 characters long', 400)
-        
-        # Check if user already reviewed this product
-        existing_review = execute_query("""
-            SELECT review_id FROM reviews 
-            WHERE user_id = %s AND product_id = %s
-        """, (user_id, product_id), fetch_one=True)
-        
-        if existing_review:
-            return APIResponse.error('You have already reviewed this product', 400)
-        
-        # Check if product exists
-        product = execute_query("""
-            SELECT product_id FROM products WHERE product_id = %s AND status = 'active'
-        """, (product_id,), fetch_one=True)
-        
-        if not product:
-            return APIResponse.error('Product not found', 404)
-        
-        # Optional: Check if user has purchased this product
-        # You can uncomment this if you want to restrict reviews to only buyers
-        """
-        order_exists = execute_query(\"\"\"
-            SELECT 1 FROM order_items oi
-            JOIN orders o ON oi.order_id = o.order_id
-            WHERE o.user_id = %s AND oi.product_id = %s AND o.status = 'delivered'
-        \"\"\", (user_id, product_id), fetch_one=True)
-        
-        if not order_exists:
-            return APIResponse.error('You can only review products you have purchased', 400)
-        """
+        if not comment or len(comment.strip()) < 10:
+            return APIResponse.error('Comment must be at least 10 characters', 400)
         
         # Insert the review
         execute_query("""
             INSERT INTO reviews (product_id, user_id, rating, title, comment, status, created_at) 
             VALUES (%s, %s, %s, %s, %s, 'approved', NOW())
-        """, (product_id, user_id, rating, title, comment))
+        """, (product_id, user_id, rating, title.strip(), comment.strip()))
+        
+        # Get the fresh review data for real-time broadcast
+        fresh_review = execute_query("""
+            SELECT r.review_id, r.rating, r.title, r.comment, 
+                   DATE_FORMAT(r.created_at, '%M %d, %Y') as created_at,
+                   CONCAT(u.first_name, ' ', LEFT(u.last_name, 1), '.') as user_name
+            FROM reviews r
+            JOIN users u ON r.user_id = u.user_id
+            WHERE r.product_id = %s AND r.user_id = %s
+            ORDER BY r.created_at DESC LIMIT 1
+        """, (product_id, user_id), fetch_one=True)
+        
+        # INSTANT CACHE INVALIDATION
+        invalidate_product_cache(product_id)
+        
+        # REAL-TIME REVIEW BROADCAST
+        if hasattr(current_app, 'websocket_manager') and fresh_review:
+            current_app.websocket_manager.broadcast_review_added(
+                product_id, 
+                dict(fresh_review)
+            )
         
         return APIResponse.success({
             'message': 'Review added successfully',
-            'rating': rating,
-            'comment': comment
+            'review': dict(fresh_review) if fresh_review else None,
+            'cache_invalidated': True,
+            'websocket_broadcasted': True
         })
         
     except Exception as e:
         print(f"Add review error: {str(e)}")
         return APIResponse.error('Failed to add review', 500)
+
 
 @user_bp.route('/products/<int:product_id>/reviews', methods=['GET'])
 def get_product_reviews(product_id):

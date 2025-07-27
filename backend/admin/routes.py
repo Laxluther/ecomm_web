@@ -327,22 +327,19 @@ def update_product(admin_id, product_id):
     execute_query(query, params)
     
     # Update inventory if stock_quantity is provided
-    # Update inventory if stock_quantity is provided
+    stock_quantity = None
     if 'stock_quantity' in data:
+        stock_quantity = data['stock_quantity']
         execute_query("""
             UPDATE inventory SET quantity = %s 
             WHERE product_id = %s
-        """, (data['stock_quantity'], product_id))
-
-    # INSTANT CACHE INVALIDATION
+        """, (stock_quantity, product_id))
     
-    invalidate_product_cache(product_id)
-    
-    # Clear cache
-    current_app.cache.delete('featured_products')
-    current_app.cache.delete(f'product_detail_{product_id}')
+    # FIXED: Pass stock_quantity for WebSocket broadcast
+    invalidate_product_cache(product_id, stock_quantity)
     
     return jsonify({'message': 'Product updated successfully'}), 200
+
 
 @admin_bp.route('/products/<int:product_id>/images', methods=['POST'])
 @admin_token_required
