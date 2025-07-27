@@ -17,7 +17,23 @@ import { useCartStore } from "@/lib/store"
 import { useAuth } from "@/lib/auth"
 import api from "@/lib/api"
 import toast from "react-hot-toast"
+const getNumericValue = (value: any): number => {
+  try {
+    const num = parseFloat(String(value || 0))
+    return isNaN(num) ? 0 : num
+  } catch (error) {
+    return 0
+  }
+}
 
+const formatCurrency = (value: any): string => {
+  try {
+    const num = getNumericValue(value)
+    return `₹${num.toFixed(2)}`
+  } catch (error) {
+    return "₹0.00"
+  }
+}
 export default function ProductDetailPage() {
   const params = useParams()
   const productId = params.id as string
@@ -111,8 +127,11 @@ export default function ProductDetailPage() {
     )
   }
 
-  const discountPercentage = Math.round(((product.price - product.discount_price) / product.price) * 100)
-
+  const productPrice = getNumericValue(product.price)
+const productDiscountPrice = getNumericValue(product.discount_price)
+const discountPercentage = productPrice > 0 && productDiscountPrice > 0 
+  ? Math.round(((productPrice - productDiscountPrice) / productPrice) * 100)
+  : 0
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
@@ -181,15 +200,21 @@ export default function ProductDetailPage() {
             </div>
 
             {/* Price */}
-            <div className="flex items-center space-x-4">
-              <span className="text-3xl font-bold text-amber-600">₹{product.discount_price.toFixed(0)}</span>
-              {product.price > product.discount_price && (
-                <>
-                  <span className="text-xl text-gray-500 line-through">₹{product.price.toFixed(0)}</span>
-                  <Badge variant="destructive">Save ₹{product.savings.toFixed(0)}</Badge>
-                </>
-              )}
-            </div>
+<div className="flex items-center space-x-4">
+  <span className="text-3xl font-bold text-amber-600">
+    ₹{getNumericValue(product.discount_price).toFixed(0)}
+  </span>
+  {getNumericValue(product.price) > getNumericValue(product.discount_price) && (
+    <>
+      <span className="text-xl text-gray-500 line-through">
+        ₹{getNumericValue(product.price).toFixed(0)}
+      </span>
+      <Badge variant="destructive">
+        {Math.round(((getNumericValue(product.price) - getNumericValue(product.discount_price)) / getNumericValue(product.price)) * 100)}% OFF
+      </Badge>
+    </>
+  )}
+</div>
 
             {/* Stock Status */}
             <div>
