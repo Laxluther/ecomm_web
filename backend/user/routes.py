@@ -769,7 +769,7 @@ def create_order(user_id):
             payment_method, 'pending', json.dumps(shipping_address), 
             datetime.now()
         ))
-        
+        updated_products = []
         # Create order items
         for item in items:
             product_id = item['product_id']
@@ -788,21 +788,23 @@ def create_order(user_id):
                 unit_price, total_price, datetime.now()
             ))
             
-            # Update inventory (reduce stock)
-            # Update inventory (reduce stock)
-        execute_query("""
-    UPDATE inventory SET quantity = quantity - %s 
-    WHERE product_id = %s AND quantity >= %s
-""", (quantity, product_id, quantity))
-
-        # INSTANT CACHE INVALIDATION for stock change
+            
+            execute_query("""
+            UPDATE inventory SET quantity = quantity - %s 
+            WHERE product_id = %s AND quantity >= %s
+            """, (quantity, product_id, quantity))
         
-        new_stock = execute_query("""
-            SELECT quantity FROM inventory WHERE product_id = %s
-        """, (product_id,), fetch_one=True)
+            updated_products.append(product_id)
+            
+        for product_id in updated_products:
+            new_stock = execute_query("""
+                SELECT quantity FROM inventory WHERE product_id = %s
+            """, (product_id,), fetch_one=True)
+            
+            new_quantity = new_stock['quantity'] if new_stock else 0
+            invalidate_product_cache(product_id, new_quantity)
 
-        new_quantity = new_stock['quantity'] if new_stock else 0
-        invalidate_product_cache(product_id, new_quantity)
+        
         
         # Clear the user's cart
         execute_query("""
