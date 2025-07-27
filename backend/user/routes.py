@@ -144,13 +144,15 @@ def get_current_user(user_id):
     return APIResponse.success({'user': user})
 
 # Product Routes
+# UPDATE THE EXISTING get_products FUNCTION IN user/routes.py
+
 @user_bp.route('/products', methods=['GET'])
 def get_products():
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 20))
     category_id = request.args.get('category_id')
     search_query = request.args.get('search', '').strip()
-    sort_by = request.args.get('sort_by', 'created_at')  # ADD THIS LINE
+    sort_by = request.args.get('sort_by', 'created_at')
     
     if category_id:
         try:
@@ -160,11 +162,11 @@ def get_products():
     
     offset = (page - 1) * per_page
     
-    # CHANGE THIS LINE - add sort_by to cache key
+    # Cache key includes sort_by
     cache_key = f'user_products_{page}_{per_page}_{category_id}_{search_query}_{sort_by}'
     cached_data = current_app.cache.get(cache_key)
     if cached_data:
-        return jsonify(cached_data), 200  # CHANGE: return cached_data directly
+        return jsonify(cached_data), 200
     
     query = """
         SELECT p.product_id, p.product_name, p.description, p.price, 
@@ -190,7 +192,7 @@ def get_products():
         query += " AND (p.product_name LIKE %s OR p.description LIKE %s)"
         params.extend([f'%{search_query}%', f'%{search_query}%'])
     
-    # ADD THIS ENTIRE SECTION FOR SORTING
+    # SORTING LOGIC
     sort_mapping = {
         'name': 'p.product_name ASC',
         'price_low': 'p.discount_price ASC, p.price ASC',
@@ -202,7 +204,7 @@ def get_products():
     order_clause = sort_mapping.get(sort_by, 'p.created_at DESC')
     query += f" ORDER BY {order_clause}"
     
-    # ADD THIS SECTION FOR TOTAL COUNT
+    # TOTAL COUNT QUERY
     count_query = """
         SELECT COUNT(*) as total
         FROM products p 
@@ -221,37 +223,48 @@ def get_products():
     
     total_count = execute_query(count_query, count_params, fetch_one=True)['total']
     
-    # KEEP THIS EXISTING SECTION BUT MODIFY THE RETURN
+    # PAGINATION
     query += " LIMIT %s OFFSET %s"
     params.extend([per_page, offset])
     
     products = execute_query(query, params, fetch_all=True)
     
+    # ENHANCED: Process products with better stock and savings logic
     for product in products:
-        product['in_stock'] = (product.get('stock_quantity') or 0) > 0
+        # FIXED: Set in_stock based on stock_quantity (automatically out of stock when 0)
+        stock_quantity = product.get('stock_quantity') or 0
+        product['in_stock'] = stock_quantity > 0
+        
+        # Calculate savings if discount exists
         if product.get('discount_price') and product.get('price'):
-            product['savings'] = round(float(product['price']) - float(product['discount_price']), 2)
+            discount_price = float(product['discount_price'])
+            price = float(product['price'])
+            if price > discount_price:
+                product['savings'] = round(price - discount_price, 2)
+            else:
+                product['savings'] = 0
         else:
             product['savings'] = 0
         
+        # Convert image URL to absolute
         if product.get('primary_image'):
             product['primary_image'] = convert_image_url(product['primary_image'])
     
-    # REPLACE YOUR EXISTING RETURN WITH THIS
-    response_data = {
-        'products': products,
-        'pagination': {
-            'page': page,
-            'per_page': per_page,
-            'total': total_count,
-            'pages': (total_count + per_page - 1) // per_page,
-            'has_next': page < ((total_count + per_page - 1) // per_page),
-            'has_prev': page > 1
-        },
-        'cached': False
+    # Pagination info
+    pagination = {
+        'page': page,
+        'per_page': per_page,
+        'total': total_count,
+        'pages': (total_count + per_page - 1) // per_page
     }
     
-    current_app.cache.set(cache_key, response_data, timeout=300)
+    response_data = {
+        'products': products,
+        'pagination': pagination
+    }
+    
+    # Cache for 2 minutes
+    current_app.cache.set(cache_key, response_data, timeout=120)
     
     return jsonify(response_data), 200
 

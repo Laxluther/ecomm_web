@@ -17,17 +17,34 @@ def health_check():
 @shared_bp.route('/public/products/featured', methods=['GET'])
 def public_featured_products():
     products = execute_query("""
-        SELECT p.product_id, p.product_name, p.price, p.discount_price,
+        SELECT p.product_id, p.product_name, p.price, p.discount_price, p.brand,
                (SELECT pi.image_url FROM product_images pi 
                 WHERE pi.product_id = p.product_id AND pi.is_primary = 1 
-                LIMIT 1) as primary_image
+                LIMIT 1) as primary_image,
+               (SELECT i.quantity FROM inventory i 
+                WHERE i.product_id = p.product_id) as stock_quantity
         FROM products p 
         WHERE p.is_featured = 1 AND p.status = 'active'
         ORDER BY p.created_at DESC LIMIT 6
     """, fetch_all=True)
     
-    # Convert image URLs to absolute URLs
+    # Convert image URLs to absolute URLs and add stock status
     products = convert_products_images(products)
+    
+    # ADDED: Calculate in_stock status and savings for each product
+    for product in products:
+        # Set in_stock based on stock_quantity
+        product['in_stock'] = (product.get('stock_quantity') or 0) > 0
+        
+        # Calculate savings if discount exists
+        if product.get('discount_price') and product.get('price'):
+            product['savings'] = round(float(product['price']) - float(product['discount_price']), 2)
+        else:
+            product['savings'] = 0
+        
+        # Add category name if needed (for consistency)
+        if not product.get('category_name'):
+            product['category_name'] = ''
     
     return jsonify({'products': products}), 200
 

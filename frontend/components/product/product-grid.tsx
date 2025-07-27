@@ -14,6 +14,7 @@ interface Product {
   primary_image: string
   savings: number
   in_stock: boolean
+  stock_quantity?: number  // Added stock_quantity
   category_name: string
   brand: string
 }
@@ -29,6 +30,12 @@ export function ProductGrid({ products }: ProductGridProps) {
   const handleAddToCart = async (product: Product) => {
     if (!isAuthenticated) {
       toast.error("Please login to add items to cart")
+      return
+    }
+
+    // ENHANCED: Check stock before adding to cart
+    if (!product.in_stock || (product.stock_quantity && product.stock_quantity <= 0)) {
+      toast.error("This product is currently out of stock")
       return
     }
 
@@ -49,24 +56,60 @@ export function ProductGrid({ products }: ProductGridProps) {
       })
 
       toast.success(`${product.product_name} added to cart!`)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding item to cart:", error)
-      toast.error("Failed to add item to cart")
+      
+      // ENHANCED: Better error handling for stock issues
+      if (error.response?.data?.error?.includes('out of stock')) {
+        toast.error("This product is currently out of stock")
+      } else if (error.response?.data?.error?.includes('insufficient stock')) {
+        toast.error("Insufficient stock available")
+      } else {
+        toast.error("Failed to add item to cart")
+      }
     }
   }
 
   if (products.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 text-lg">No products found</p>
+        <div className="max-w-sm mx-auto">
+          <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">📦</span>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Products Found</h3>
+          <p className="text-gray-500">Try adjusting your search or filters to find what you're looking for.</p>
+        </div>
       </div>
     )
   }
 
+  // ENHANCED: Process products to ensure they have all required fields
+  const processedProducts = products.map(product => ({
+    ...product,
+    // Ensure stock_quantity is available for proper stock display
+    stock_quantity: product.stock_quantity || 0,
+    // Ensure in_stock is properly calculated
+    in_stock: product.in_stock && (product.stock_quantity || 0) > 0,
+    // Ensure savings is calculated
+    savings: product.savings || (
+      product.price > product.discount_price 
+        ? product.price - product.discount_price 
+        : 0
+    ),
+    // Ensure brand and category_name have fallbacks
+    brand: product.brand || 'Unknown Brand',
+    category_name: product.category_name || '',
+  }))
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {products.map((product) => (
-        <ProductCard key={product.product_id} product={product} onAddToCart={() => handleAddToCart(product)} />
+      {processedProducts.map((product) => (
+        <ProductCard 
+          key={product.product_id} 
+          product={product} 
+          onAddToCart={() => handleAddToCart(product)} 
+        />
       ))}
     </div>
   )

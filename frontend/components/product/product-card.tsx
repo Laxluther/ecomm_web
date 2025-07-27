@@ -21,6 +21,7 @@ interface Product {
   primary_image: string
   savings: number | string
   in_stock: boolean
+  stock_quantity?: number  // Added stock_quantity
   category_name: string
   brand: string
 }
@@ -41,61 +42,65 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
     typeof product.discount_price === "string" ? Number.parseFloat(product.discount_price) : product.discount_price
   const savings = typeof product.savings === "string" ? Number.parseFloat(product.savings) : product.savings
 
+  // ENHANCED: Better stock logic
+  const stockQuantity = product.stock_quantity || 0
+  const isInStock = product.in_stock && stockQuantity > 0
+  const isLowStock = stockQuantity > 0 && stockQuantity <= 5
+  
   // Calculate discount percentage safely
   const discountPercentage = price > 0 ? Math.round(((price - discountPrice) / price) * 100) : 0
 
-  const handleWishlistToggle = async (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
+  const handleAddToCart = () => {
+    if (!isAuthenticated) {
+      toast.error("Please login to add items to cart")
+      return
+    }
 
+    if (!isInStock) {
+      toast.error("This product is currently out of stock")
+      return
+    }
+
+    onAddToCart()
+  }
+
+  const handleWishlistToggle = async () => {
     if (!isAuthenticated) {
       toast.error("Please login to add items to wishlist")
       return
     }
 
     setIsWishlistLoading(true)
-
     try {
       if (isInWishlist) {
         await api.delete(`/wishlist/remove/${product.product_id}`)
         setIsInWishlist(false)
         toast.success("Removed from wishlist")
       } else {
-        await api.post("/wishlist/add", {
-          product_id: product.product_id,
-        })
+        await api.post("/wishlist/add", { product_id: product.product_id })
         setIsInWishlist(true)
         toast.success("Added to wishlist")
       }
     } catch (error) {
+      console.error("Wishlist error:", error)
       toast.error("Failed to update wishlist")
     } finally {
       setIsWishlistLoading(false)
     }
   }
 
-  const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    onAddToCart()
-  }
-
   return (
-    <Card className="group hover:shadow-lg transition-shadow duration-300 relative">
+    <Card className="group hover:shadow-lg transition-all duration-300 relative overflow-hidden">
       <CardContent className="p-0">
-        <div className="relative">
-          <Link href={`/product/${product.product_id}`}>
-            <div className="aspect-square relative overflow-hidden rounded-t-lg">
-              <Image
-                src={product.primary_image || "/placeholder.svg?height=300&width=300"}
-                alt={product.product_name}
-                fill
-                className="object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-            </div>
-          </Link>
+        <div className="relative aspect-square overflow-hidden">
+          <Image
+            src={product.primary_image || "/placeholder.svg?height=300&width=300"}
+            alt={product.product_name}
+            fill
+            className="object-cover group-hover:scale-105 transition-transform duration-300"
+          />
 
-          {/* Wishlist Heart Button */}
+          {/* Wishlist Button */}
           <button
             onClick={handleWishlistToggle}
             disabled={isWishlistLoading}
@@ -109,15 +114,25 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
             <Heart className={`h-4 w-4 ${isInWishlist ? "fill-current" : ""}`} />
           </button>
 
+          {/* Discount Badge */}
           {discountPercentage > 0 && (
-            <Badge className="absolute top-2 left-2 bg-red-500 hover:bg-red-600">{discountPercentage}% OFF</Badge>
-          )}
-
-          {!product.in_stock && (
-            <Badge variant="secondary" className="absolute bottom-2 left-2">
-              Out of Stock
+            <Badge className="absolute top-2 left-2 bg-red-500 hover:bg-red-600">
+              {discountPercentage}% OFF
             </Badge>
           )}
+
+          {/* ENHANCED: Stock Status Badges */}
+          {!isInStock ? (
+            <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+              <Badge variant="destructive" className="text-white bg-red-600 text-base px-4 py-2">
+                Out of Stock
+              </Badge>
+            </div>
+          ) : isLowStock ? (
+            <Badge variant="secondary" className="absolute bottom-2 left-2 bg-orange-500 text-white">
+              Only {stockQuantity} left!
+            </Badge>
+          ) : null}
         </div>
 
         <div className="p-4">
@@ -146,14 +161,30 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
             {savings > 0 && <span className="text-sm text-green-600 font-medium">Save ₹{savings.toFixed(0)}</span>}
           </div>
 
+          {/* ENHANCED: Stock Information Display */}
+          {isInStock && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600">Stock:</span>
+                <span className={`font-medium ${isLowStock ? 'text-orange-600' : 'text-green-600'}`}>
+                  {stockQuantity > 10 ? 'In Stock' : `${stockQuantity} left`}
+                </span>
+              </div>
+            </div>
+          )}
+
           <Button
             onClick={handleAddToCart}
-            disabled={!product.in_stock}
-            className="w-full bg-emerald-600 hover:bg-emerald-700"
+            disabled={!isInStock}
+            className={`w-full ${
+              isInStock 
+                ? 'bg-emerald-600 hover:bg-emerald-700' 
+                : 'bg-gray-400 cursor-not-allowed'
+            }`}
             size="sm"
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
-            {product.in_stock ? "Add to Cart" : "Out of Stock"}
+            {isInStock ? "Add to Cart" : "Out of Stock"}
           </Button>
         </div>
       </CardContent>
