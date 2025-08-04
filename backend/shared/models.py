@@ -25,20 +25,30 @@ def get_db_connection():
         use_pure=True,
         autocommit=False
     )
-# ADD THIS FUNCTION
-def validate_query_security(query):
-    """Check for dangerous SQL patterns"""
+def validate_query_security(query, params=None):
+    """Validate query for security issues"""
+    # Check for dangerous SQL patterns
     dangerous_patterns = [
-        r';\s*(drop|delete|update|insert|alter|create)\s+',
+        r';\s*(drop|delete|update|insert|alter|create|truncate)\s+',
         r'union\s+select',
         r'--\s*',
         r'/\*.*?\*/',
+        r'\bexec\b',
+        r'\bexecute\b',
+        r'\bsp_\w+',
+        r'\bxp_\w+',
     ]
     
     query_lower = query.lower()
     for pattern in dangerous_patterns:
         if re.search(pattern, query_lower):
-            raise ValueError(f"Potentially dangerous SQL pattern detected")
+            raise ValueError(f"Potentially dangerous SQL pattern detected: {pattern}")
+    
+    # Ensure parameterized queries are used
+    if params is None and ('%s' in query or '?' in query):
+        raise ValueError("Query appears to use parameters but none provided")
+    
+    return True
 def execute_query(query, params=None, fetch_one=False, fetch_all=False, get_insert_id=False):
     """
     Execute database query with various return options
@@ -56,7 +66,7 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=False, get_inse
         - If get_insert_id: integer ID of inserted row
         - Default: lastrowid (for INSERT) or rowcount (for UPDATE/DELETE)
     """
-    validate_query_security(query)
+    validate_query_security(query,params)
     conn = None
     cursor = None
     try:

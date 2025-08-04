@@ -7,8 +7,21 @@ import jwt
 from datetime import datetime, timedelta
 import bleach
 import re
+from email_validator import validate_email, EmailNotValidError
 from main import limiter
 user_auth_bp = Blueprint('user_auth', __name__)
+def validate_password_strength(password):
+    if len(password) < 12:
+        return False, "Password must be at least 12 characters long"
+    if not re.search(r'[A-Z]', password):
+        return False, "Password must contain at least one uppercase letter"
+    if not re.search(r'[a-z]', password):
+        return False, "Password must contain at least one lowercase letter"
+    if not re.search(r'\d', password):
+        return False, "Password must contain at least one number"
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        return False, "Password must contain at least one special character"
+    return True, "Strong password"
 @limiter.limit("3 per minute")
 @user_auth_bp.route('/register', methods=['POST'])
 def register():
@@ -18,15 +31,35 @@ def register():
     if not all(field in data for field in required_fields):
         return jsonify({'error': 'Missing required fields'}), 400
     
-    email = data['email'].lower().strip()
-    password = data['password']
-    first_name = data['first_name'].strip()
-    last_name = data['last_name'].strip()
-    phone = data['phone'].strip()
+    email = bleach.clean(data['email'].lower().strip(), tags=[], attributes={}, strip=True)
+    password = data.get('password', '')
+    first_name = bleach.clean(data['first_name'].strip(), tags=[], attributes={}, strip=True)
+    last_name = bleach.clean(data['last_name'].strip(), tags=[], attributes={}, strip=True)
+    phone = bleach.clean(data['phone'].strip(), tags=[], attributes={}, strip=True)
+
+    # Add validation:
+    if len(email) > 254:
+        return jsonify({'error': 'Email address too long'}), 400
+    if len(first_name) < 2 or len(first_name) > 50:
+        return jsonify({'error': 'First name must be 2-50 characters'}), 400
+    if len(last_name) < 2 or len(last_name) > 50:
+        return jsonify({'error': 'Last name must be 2-50 characters'}), 400
+    if not re.match(r'^[6-9]\d{9}$', phone):
+        return jsonify({'error': 'Invalid Indian phone number format'}), 400
+
+    try:
+        valid_email = validate_email(email)
+        email = valid_email.email
+    except EmailNotValidError:
+        return jsonify({'error': 'Invalid email format'}), 400
     referral_code = data.get('referral_code', '').strip()
     
-    if len(password) < 6:
-        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+    
+
+    
+    is_strong, password_error = validate_password_strength(password)
+    if not is_strong:
+        return jsonify({'error': password_error}), 400
     
     existing_user = UserModel.get_by_email(email)
     if existing_user:
@@ -59,9 +92,14 @@ def login():
         return jsonify({'error': 'Email and password required'}), 400
     
     email = bleach.clean(data['email'].lower().strip(), tags=[], attributes={}, strip=True)
+    password = data.get('password', '')
     if len(email) > 254:
         return jsonify({'error': 'Email too long'}), 400
-    password = data['password']
+    try:
+        valid_email = validate_email(email)
+        email = valid_email.email
+    except EmailNotValidError:
+        return jsonify({'error': 'Invalid email format'}), 400
     remember_me = data.get('remember_me', False)
     
     user = UserModel.get_by_email(email)
@@ -374,8 +412,9 @@ def reset_password():
     if new_password != confirm_password:
         return jsonify({'error': 'Passwords do not match'}), 400
     
-    if len(new_password) < 12:
-        return jsonify({'error': 'Password must be at least 6 characters long'}), 400
+    is_strong, password_error = validate_password_strength(new_password)
+    if not is_strong:
+        return jsonify({'error': password_error}), 400
     
     new_password_hash = generate_password_hash(new_password)
     success = email_service.reset_password(token, new_password_hash)
