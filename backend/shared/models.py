@@ -2,7 +2,7 @@ import mysql.connector
 from datetime import datetime
 import uuid
 import os
-
+import re
 # Database connection configuration
 class Config:
     DB_HOST = os.environ.get('DB_HOST', 'localhost')
@@ -25,7 +25,20 @@ def get_db_connection():
         use_pure=True,
         autocommit=False
     )
-
+# ADD THIS FUNCTION
+def validate_query_security(query):
+    """Check for dangerous SQL patterns"""
+    dangerous_patterns = [
+        r';\s*(drop|delete|update|insert|alter|create)\s+',
+        r'union\s+select',
+        r'--\s*',
+        r'/\*.*?\*/',
+    ]
+    
+    query_lower = query.lower()
+    for pattern in dangerous_patterns:
+        if re.search(pattern, query_lower):
+            raise ValueError(f"Potentially dangerous SQL pattern detected")
 def execute_query(query, params=None, fetch_one=False, fetch_all=False, get_insert_id=False):
     """
     Execute database query with various return options
@@ -43,6 +56,7 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=False, get_inse
         - If get_insert_id: integer ID of inserted row
         - Default: lastrowid (for INSERT) or rowcount (for UPDATE/DELETE)
     """
+    validate_query_security(query)
     conn = None
     cursor = None
     try:

@@ -4,7 +4,14 @@ from flask_caching import Cache
 from config import get_config
 from websocket_manager import WebSocketManager  # ADD THIS IMPORT
 import os
-
+# ADD THESE IMPORTS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["1000 per hour", "100 per minute"]
+    )
 def create_app():
     app = Flask(__name__)
     
@@ -13,13 +20,21 @@ def create_app():
     
     app.url_map.strict_slashes = False
     
+    cors_origins = app.config.get('CORS_ORIGINS', ['http://localhost:3000'])
+
     CORS(app, 
-         origins=app.config.get('CORS_ORIGINS', ['http://localhost:3000']),
-         supports_credentials=True,
-         allow_headers=['Content-Type', 'Authorization'],
-         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+        origins=cors_origins,
+        supports_credentials=True,  # Keep this as True for now
+        allow_headers=['Content-Type', 'Authorization'],
+        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
     
     cache = Cache(app)
+    limiter.init_app(app)
+    
+
+  
+    if not app.debug:
+        Talisman(app, force_https=True)
     app.cache = cache
     
     # ADD WEBSOCKET MANAGER
@@ -54,9 +69,16 @@ def create_app():
     @app.route('/websocket/status')
     def websocket_status():
         return app.websocket_manager.get_status(), 200
-    
+    @app.after_request
+    def security_headers(response):
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+        return response
     return app
 
+    
 if __name__ == '__main__':
     app = create_app()
     app.websocket_manager.socketio.run(app, debug=True, host='0.0.0.0', port=5000)

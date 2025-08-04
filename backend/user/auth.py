@@ -5,9 +5,11 @@ from referral.models import ReferralModel
 from shared.email_service import email_service
 import jwt
 from datetime import datetime, timedelta
-
+import bleach
+import re
+from main import limiter
 user_auth_bp = Blueprint('user_auth', __name__)
-
+@limiter.limit("3 per minute")
 @user_auth_bp.route('/register', methods=['POST'])
 def register():
     data = request.get_json()
@@ -48,7 +50,7 @@ def register():
         'verification_email_sent': email_sent,
         'referral_applied': bool(referral_code)
     }), 201
-
+@limiter.limit("5 per minute")
 @user_auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
@@ -56,7 +58,9 @@ def login():
     if not data.get('email') or not data.get('password'):
         return jsonify({'error': 'Email and password required'}), 400
     
-    email = data['email'].lower().strip()
+    email = bleach.clean(data['email'].lower().strip(), tags=[], attributes={}, strip=True)
+    if len(email) > 254:
+        return jsonify({'error': 'Email too long'}), 400
     password = data['password']
     remember_me = data.get('remember_me', False)
     
@@ -137,9 +141,19 @@ def change_password():
     if not current_password or not new_password:
         return jsonify({'error': 'Current and new password required'}), 400
     
-    if len(new_password) < 6:
-        return jsonify({'error': 'New password must be at least 6 characters'}), 400
-    
+    # REPLACE WITH:
+    if len(new_password) < 12:
+        return jsonify({'error': 'Password must be at least 12 characters long'}), 400
+
+    # Check password complexity
+    if not re.search(r'[A-Z]', new_password):
+        return jsonify({'error': 'Password must contain uppercase letter'}), 400
+    if not re.search(r'[a-z]', new_password):
+        return jsonify({'error': 'Password must contain lowercase letter'}), 400
+    if not re.search(r'\d', new_password):
+        return jsonify({'error': 'Password must contain number'}), 400
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', new_password):
+        return jsonify({'error': 'Password must contain special character'}), 400
     user = UserModel.get_by_id(user_id)
     if not user or not check_password_hash(user['password_hash'], current_password):
         return jsonify({'error': 'Current password is incorrect'}), 400
@@ -360,7 +374,7 @@ def reset_password():
     if new_password != confirm_password:
         return jsonify({'error': 'Passwords do not match'}), 400
     
-    if len(new_password) < 6:
+    if len(new_password) < 12:
         return jsonify({'error': 'Password must be at least 6 characters long'}), 400
     
     new_password_hash = generate_password_hash(new_password)

@@ -1,0 +1,7 @@
+# Security files
+backend/.env
+backend/.env.*
+*.key
+*.pem
+credentials.json
+*.log

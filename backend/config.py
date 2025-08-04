@@ -15,8 +15,8 @@ class Config:
     DB_PORT = int(os.environ.get('DB_PORT') or 3306)
     
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
-    MAX_CONTENT_LENGTH = 32 * 1024 * 1024
-    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'}
+    MAX_CONTENT_LENGTH = 5 * 1024 * 1024
+    ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
     
     IMAGE_SIZES = {
         'thumbnail': (150, 150),
