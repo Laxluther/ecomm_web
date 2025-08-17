@@ -15,14 +15,14 @@ class EmailService:
         self.password = getattr(Config, 'MAIL_PASSWORD', "rxeysnootgqklxam")
         self.sender_name = getattr(Config, 'COMPANY_NAME', 'YourStore')
         
-        print(f"📧 Email service initialized:")
+        print(f"Email service initialized:")
         print(f"   SMTP: {self.smtp_server}:{self.smtp_port}")
         print(f"   From: {self.email}")
         print(f"   Password configured: {bool(self.password)}")
     
     def send_email(self, to_email, subject, html_content, text_content=None):
         if not self.email or not self.password:
-            print(f"❌ Email not configured - Missing email/password")
+            print(f"ERROR Email not configured - Missing email/password")
             print(f"   Would send: {subject} to {to_email}")
             print(f"   Please set MAIL_USERNAME and MAIL_PASSWORD in .env")
             return False
@@ -54,17 +54,17 @@ class EmailService:
                 server.login(self.email, self.password)
                 server.sendmail(self.email, to_email, message.as_string())
             
-            print(f"✅ Email sent successfully to {to_email}")
+            print(f"SUCCESS Email sent successfully to {to_email}")
             return True
             
         except smtplib.SMTPAuthenticationError:
-            print(f"❌ SMTP Authentication failed - Check email/password")
+            print(f"ERROR SMTP Authentication failed - Check email/password")
             return False
         except smtplib.SMTPException as e:
-            print(f"❌ SMTP Error: {str(e)}")
+            print(f"ERROR SMTP Error: {str(e)}")
             return False
         except Exception as e:
-            print(f"❌ Email sending failed: {str(e)}")
+            print(f"ERROR Email sending failed: {str(e)}")
             return False
     
     def send_welcome_email(self, user_email, user_name, referral_code=None):

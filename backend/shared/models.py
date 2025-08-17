@@ -7,8 +7,8 @@ import re
 class Config:
     DB_HOST = os.environ.get('DB_HOST', 'localhost')
     DB_USER = os.environ.get('DB_USER', 'root')
-    DB_PASSWORD = os.environ.get('DB_PASSWORD', '')
-    DB_NAME = os.environ.get('DB_NAME', 'ecommerce')
+    DB_PASSWORD = os.environ.get('DB_PASSWORD', 'Sanidhya@28')
+    DB_NAME = os.environ.get('DB_NAME', 'ecommerce_db')
     DB_PORT = int(os.environ.get('DB_PORT', 3306))
 
 def get_db_connection():
@@ -55,7 +55,7 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=False, get_inse
     
     Args:
         query: SQL query string
-        params: Query parameters tuple/list
+        params: Query parameters tuple/list/dict
         fetch_one: Return single row as dict
         fetch_all: Return all rows as list of dicts
         get_insert_id: Return the inserted row ID (for INSERT queries)
@@ -66,14 +66,26 @@ def execute_query(query, params=None, fetch_one=False, fetch_all=False, get_inse
         - If get_insert_id: integer ID of inserted row
         - Default: lastrowid (for INSERT) or rowcount (for UPDATE/DELETE)
     """
-    validate_query_security(query,params)
+    validate_query_security(query, params)
     conn = None
     cursor = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
         
-        cursor.execute(query, params or ())
+        # Handle different parameter formats for compatibility
+        if params is not None:
+            if isinstance(params, dict):
+                # Convert named parameters to positional for mysql-connector-python
+                # This is a simplified conversion - mysql-connector supports both formats
+                cursor.execute(query, params)
+            elif isinstance(params, (list, tuple)):
+                cursor.execute(query, params)
+            else:
+                # Single parameter, convert to tuple
+                cursor.execute(query, (params,))
+        else:
+            cursor.execute(query)
         
         if fetch_one:
             result = cursor.fetchone()
