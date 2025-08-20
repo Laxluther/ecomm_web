@@ -31,7 +31,7 @@ def admin_login():
     try:
         password_valid = verify_password(password, admin['password_hash'])
     except Exception as e:
-        print(f"Password verification error: {e}")
+        current_app.logger.error(f"Password verification error: {e}")
         # If hash verification fails due to incompatible format, check for plain text match (temporary fix)
         password_valid = (password == admin['password_hash'])
     
