@@ -27,7 +27,7 @@ class EmailService:
             print(f"   Please set MAIL_USERNAME and MAIL_PASSWORD in .env")
             return False
         
-        print(f"📧 Sending email:")
+        print(f"EMAIL Sending email:")
         print(f"   To: {to_email}")
         print(f"   Subject: {subject}")
         print(f"   From: {self.email}")

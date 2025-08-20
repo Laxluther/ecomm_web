@@ -4,12 +4,12 @@ import { create } from "zustand"
 import { persist } from "zustand/middleware"
 
 interface CartItem {
-  cart_id: number
+  cart_id?: number
   product_id: number
   product_name: string
   quantity: number
   price: number
-  discount_price: number
+  discount_price?: number
   image_url: string
 }
 
@@ -17,6 +17,7 @@ interface CartState {
   items: CartItem[]
   hasHydrated: boolean
   setHasHydrated: () => void
+  setItems: (items: CartItem[]) => void
   addItem: (item: CartItem) => void
   removeItem: (productId: number) => void
   updateQuantity: (productId: number, quantity: number) => void
@@ -32,6 +33,8 @@ export const useCartStore = create<CartState>()(
       hasHydrated: false,
 
       setHasHydrated: () => set({ hasHydrated: true }),
+
+      setItems: (items: CartItem[]) => set({ items }),
 
       addItem: (item: CartItem) => {
         const items = get().items

@@ -7,12 +7,15 @@
       "Bash(pip install:*)",
       "Bash(curl:*)",
       "Bash(grep:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": [],
     "additionalDirectories": [
-      "S:\\mnt\\s\\web"
+      "S:\\mnt\\s\\web",
+      "S:\\s\\web"
     ]
   }
 }

@@ -13,9 +13,8 @@ import { Badge } from "@/components/ui/badge"
 import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft } from "lucide-react"
 import { useCartStore } from "@/lib/store"
 import { useAuth } from "@/lib/auth"
-import api from "@/lib/api"
-import toast from "react-hot-toast"
 import { cartAPI } from "@/lib/api"
+import toast from "react-hot-toast"
 export default function CartPage() {
   const { items, setItems, updateQuantity, removeItem, getTotalItems, getTotalPrice } = useCartStore()
   const { isAuthenticated } = useAuth()
@@ -23,10 +22,11 @@ export default function CartPage() {
   const { data: cartData, refetch } = useQuery({
     queryKey: ["cart"],
     queryFn: async () => {
-      const response = await cartAPI.get()
-      return response.data
+      return await cartAPI.get()
     },
     enabled: isAuthenticated,
+    retry: 3,
+    retryDelay: 1000,
   })
 
   useEffect(() => {
@@ -37,12 +37,10 @@ export default function CartPage() {
 
   const handleUpdateQuantity = async (productId: number, newQuantity: number) => {
     try {
-      await api.put("/cart/update", {
-        product_id: productId,
-        quantity: newQuantity,
-      })
+      await cartAPI.update(productId, newQuantity)
       updateQuantity(productId, newQuantity)
       refetch()
+      toast.success("Quantity updated")
     } catch (error) {
       toast.error("Failed to update quantity")
     }
@@ -50,7 +48,7 @@ export default function CartPage() {
 
   const handleRemoveItem = async (productId: number) => {
     try {
-      await api.delete(`/cart/remove/${productId}`)
+      await cartAPI.remove(productId)
       removeItem(productId)
       toast.success("Item removed from cart")
       refetch()

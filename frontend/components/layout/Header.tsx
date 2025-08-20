@@ -32,7 +32,7 @@ export function Header() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    if (searchQuery.trim()) {
+    if (searchQuery.trim() && typeof window !== 'undefined') {
       window.location.href = `/shop?search=${encodeURIComponent(searchQuery)}`
     }
   }

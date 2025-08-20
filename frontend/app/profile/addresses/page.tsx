@@ -18,7 +18,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { MapPin, Plus, Edit, Trash2, Home, Building, ArrowLeft } from "lucide-react"
 import { useAuth } from "@/lib/auth"
-import api from "@/lib/api"
+import { addressesAPI } from "@/lib/api"
 import toast from "react-hot-toast"
 import Link from "next/link"
 
@@ -55,19 +55,19 @@ export default function AddressesPage() {
 
   const queryClient = useQueryClient()
 
-  const { data: addressesData, isLoading } = useQuery({
+  const { data: addressesData, isLoading, error: addressesError, refetch: refetchAddresses } = useQuery({
     queryKey: ["addresses"],
     queryFn: async () => {
-      const response = await api.get("/addresses")
-      return response.data
+      return await addressesAPI.getAll()
     },
     enabled: isAuthenticated,
+    retry: 3,
+    retryDelay: 1000,
   })
 
   const addAddressMutation = useMutation({
     mutationFn: async (addressData: any) => {
-      const response = await api.post("/addresses", addressData)
-      return response.data
+      return await addressesAPI.add(addressData)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["addresses"] })
@@ -82,8 +82,7 @@ export default function AddressesPage() {
 
   const updateAddressMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const response = await api.put(`/addresses/${id}`, data)
-      return response.data
+      return await addressesAPI.update(id, data)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["addresses"] })
@@ -99,8 +98,7 @@ export default function AddressesPage() {
 
   const deleteAddressMutation = useMutation({
     mutationFn: async (addressId: number) => {
-      const response = await api.delete(`/addresses/${addressId}`)
-      return response.data
+      return await addressesAPI.delete(addressId)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["addresses"] })
@@ -187,6 +185,29 @@ export default function AddressesPage() {
             <Button asChild className="bg-emerald-600 hover:bg-emerald-700">
               <Link href="/login">Login</Link>
             </Button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    )
+  }
+
+  // Error handling for addresses
+  if (addressesError) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Unable to Load Addresses</h1>
+            <p className="text-gray-600 mb-4">
+              We're having trouble connecting to our servers.
+              Please check if your backend is running on http://localhost:5000
+            </p>
+            <div className="space-x-4">
+              <Button onClick={() => refetchAddresses()}>Try Again</Button>
+              <Button onClick={() => window.location.reload()} variant="outline">Refresh Page</Button>
+            </div>
           </div>
         </div>
         <Footer />

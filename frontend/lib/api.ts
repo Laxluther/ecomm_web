@@ -48,11 +48,25 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle network errors
+    if (!error.response) {
+      console.error('Network error:', error.message)
+      error.message = 'Network error. Please check your connection and ensure the backend is running.'
+    }
+    
     if (error.response?.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("token")
       localStorage.removeItem("user")
-      window.location.href = "/login"
+      if (typeof window !== "undefined") {
+        window.location.href = "/login"
+      }
     }
+    
+    // Handle other common HTTP errors
+    if (error.response?.status === 500) {
+      error.message = 'Server error. Please try again later.'
+    }
+    
     return Promise.reject(error)
   },
 )
@@ -77,11 +91,44 @@ adminApi.interceptors.request.use(
 adminApi.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Handle network errors
+    if (!error.response) {
+      console.error('Network error:', error.message)
+      error.message = 'Network error. Please check your connection and ensure the backend is running.'
+    }
+    
     if (error.response?.status === 401 && typeof window !== "undefined") {
       localStorage.removeItem("adminToken")
       localStorage.removeItem("admin")
-      window.location.href = "/admin/login"
+      if (typeof window !== "undefined") {
+        window.location.href = "/admin/login"
+      }
     }
+    
+    // Handle other common HTTP errors
+    if (error.response?.status === 500) {
+      error.message = 'Server error. Please try again later.'
+    }
+    
+    return Promise.reject(error)
+  },
+)
+
+// Public API response interceptor
+publicApi.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // Handle network errors
+    if (!error.response) {
+      console.error('Network error:', error.message)
+      error.message = 'Network error. Please check your connection and ensure the backend is running.'
+    }
+    
+    // Handle other common HTTP errors
+    if (error.response?.status === 500) {
+      error.message = 'Server error. Please try again later.'
+    }
+    
     return Promise.reject(error)
   },
 )
@@ -255,6 +302,24 @@ export const referralsAPI = {
 
   get: async () => {
     const response = await api.get("/referrals")
+    return response.data
+  },
+}
+
+// Orders
+export const ordersAPI = {
+  getAll: async () => {
+    const response = await api.get("/orders")
+    return response.data
+  },
+
+  getById: async (id: string) => {
+    const response = await api.get(`/orders/${id}`)
+    return response.data
+  },
+
+  create: async (orderData: any) => {
+    const response = await api.post("/orders", orderData)
     return response.data
   },
 }

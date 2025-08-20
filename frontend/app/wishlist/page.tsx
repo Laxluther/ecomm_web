@@ -86,11 +86,13 @@ export default function WishlistPage() {
       // Update local cart store
       const item = wishlistItems?.find(item => item.product_id === productId)
       if (item) {
-        const price = getNumericValue(item.discount_price) || getNumericValue(item.price)
+        const price = getNumericValue(item.price) || 0
+        const discountPrice = getNumericValue(item.discount_price) || price
         addItem({
           product_id: item.product_id,
           product_name: item.product_name || 'Product',
           price: price,
+          discount_price: discountPrice,
           quantity: 1,
           image_url: item.primary_image || '/placeholder.svg'
         })

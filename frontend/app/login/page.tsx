@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { useAuth } from "@/lib/auth"
-import api from "@/lib/api"
+import { authAPI } from "@/lib/api"
 import toast from "react-hot-toast"
 import { Eye, EyeOff, AlertCircle, Mail } from "lucide-react"
 
@@ -37,13 +37,8 @@ export default function LoginPage() {
     setEmailNotVerified(false)
 
     try {
-      const response = await api.post("/auth/login", {
-        email,
-        password,
-        remember_me: rememberMe,
-      })
-
-      const { token, user } = response.data
+      const response = await authAPI.login(email, password, rememberMe)
+      const { token, user } = response
       login(token, user)
       toast.success("Login successful! Welcome back!")
       router.push("/")
@@ -66,7 +61,7 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      await api.post("/auth/forgot-password", { email: forgotPasswordEmail })
+      await authAPI.forgotPassword(forgotPasswordEmail)
       setForgotPasswordSent(true)
       toast.success("Password reset email sent! Please check your inbox.")
     } catch (error: any) {
@@ -79,7 +74,7 @@ export default function LoginPage() {
   const resendVerificationEmail = async () => {
     try {
       setIsLoading(true)
-      await api.post("/auth/resend-verification", { email })
+      await authAPI.resendVerification(email)
       toast.success("Verification email sent! Please check your inbox.")
     } catch (error: any) {
       toast.error(error.response?.data?.message || "Failed to resend verification email")

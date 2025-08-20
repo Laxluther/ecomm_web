@@ -45,14 +45,14 @@ export default function ReferralsPage() {
   }
 
   const copyReferralLink = () => {
-    const link = `${window.location.origin}/register?ref=${referralData?.referral_code}`
+    const link = `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/register?ref=${referralData?.referral_code}`
     navigator.clipboard.writeText(link)
     toast.success("Referral link copied!")
   }
 
   const shareReferral = () => {
     const text = `Join lorem ipsum and get premium natural products! Use my referral code ${referralData?.referral_code} and get ₹50 bonus on your first purchase!`
-    const link = `${window.location.origin}/register?ref=${referralData?.referral_code}`
+    const link = `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}/register?ref=${referralData?.referral_code}`
 
     if (navigator.share) {
       navigator.share({
