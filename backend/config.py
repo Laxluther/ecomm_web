@@ -4,15 +4,27 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'your-secret-key-change-in-production'
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'your-jwt-secret-key'
+    # Security keys - Must be set in environment variables
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
     JWT_EXPIRATION_DELTA = 24
     
-    DB_HOST = os.environ.get('DB_HOST') or 'localhost'
-    DB_USER = os.environ.get('DB_USER') or 'root'
-    DB_PASSWORD = os.environ.get('DB_PASSWORD') or 'Sanidhya@28'
-    DB_NAME = os.environ.get('DB_NAME') or 'ecommerce_db'
-    DB_PORT = int(os.environ.get('DB_PORT') or 3306)
+    # Validate required security keys
+    if not SECRET_KEY:
+        raise ValueError("SECRET_KEY environment variable is required")
+    if not JWT_SECRET_KEY:
+        raise ValueError("JWT_SECRET_KEY environment variable is required")
+    
+    # Database configuration - Must be set in environment variables
+    DB_HOST = os.environ.get('DB_HOST', 'localhost')
+    DB_USER = os.environ.get('DB_USER', 'root')
+    DB_PASSWORD = os.environ.get('DB_PASSWORD')
+    DB_NAME = os.environ.get('DB_NAME', 'ecommerce_db')
+    DB_PORT = int(os.environ.get('DB_PORT', '3306'))
+    
+    # Validate required database password
+    if not DB_PASSWORD:
+        raise ValueError("DB_PASSWORD environment variable is required")
     
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
     MAX_CONTENT_LENGTH = 5 * 1024 * 1024
@@ -38,9 +50,25 @@ class Config:
     CACHE_TIMEOUT_PRODUCT_DETAIL = 180
     CACHE_TIMEOUT_USER_SESSION = 1800
     
-    COMPANY_NAME = 'WellnessNest'
-    COMPANY_EMAIL = 'info@yourstore.com'
-    COMPANY_PHONE = '6261116108'
+    # Email configuration
+    MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+    MAIL_PORT = int(os.environ.get('MAIL_PORT', '587'))
+    MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
+    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER')
+    
+    # Email feature flags
+    EMAIL_VERIFICATION_REQUIRED = os.environ.get('EMAIL_VERIFICATION_REQUIRED', 'true').lower() == 'true'
+    SEND_ORDER_EMAILS = os.environ.get('SEND_ORDER_EMAILS', 'true').lower() == 'true'
+    
+    # URL configuration
+    BACKEND_BASE_URL = os.environ.get('BACKEND_BASE_URL', 'http://localhost:5000')
+    FRONTEND_BASE_URL = os.environ.get('FRONTEND_BASE_URL', 'http://localhost:3000')
+    
+    # Company information
+    COMPANY_NAME = os.environ.get('COMPANY_NAME', 'WellnessNest')
+    COMPANY_EMAIL = os.environ.get('COMPANY_EMAIL', 'info@wellnessnest.com')
+    COMPANY_PHONE = os.environ.get('COMPANY_PHONE', '6261116108')
     
     BUSINESS_STATE_CODE = 'MP'
     FREE_DELIVERY_THRESHOLD = 500

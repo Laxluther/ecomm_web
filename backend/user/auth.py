@@ -255,7 +255,7 @@ def verify_email_link(token):
         <html>
         <head>
             <title>Email Verified</title>
-            <meta http-equiv="refresh" content="3;url=http://localhost:3000/login">
+            <meta http-equiv="refresh" content="3;url={current_app.config.get('FRONTEND_BASE_URL', 'http://localhost:3000')}/login">
             <style>
                 body {{ font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }}
                 .success {{ color: #4CAF50; }}
@@ -268,7 +268,7 @@ def verify_email_link(token):
                 <p>Hi {user['first_name']},</p>
                 <p>Your email <strong>{user['email']}</strong> has been verified.</p>
                 <p>You will be redirected to login in 3 seconds...</p>
-                <p><a href="http://localhost:3000/login">Click here if not redirected</a></p>
+                <p><a href="{current_app.config.get('FRONTEND_BASE_URL', 'http://localhost:3000')}/login">Click here if not redirected</a></p>
             </div>
         </body>
         </html>
@@ -289,7 +289,7 @@ def verify_email_link(token):
             <div class="container">
                 <h1 class="error">❌ Verification Failed</h1>
                 <p>The verification link is invalid or has expired.</p>
-                <p><a href="http://localhost:3000/login">Go to Login</a></p>
+                <p><a href="{current_app.config.get('FRONTEND_BASE_URL', 'http://localhost:3000')}/login">Go to Login</a></p>
             </div>
         </body>
         </html>

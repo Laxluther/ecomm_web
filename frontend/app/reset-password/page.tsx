@@ -34,7 +34,7 @@ export default function ResetPasswordPage() {
       }
 
       try {
-        await api.post("/auth/validate-reset-token", { token })
+        await api.post("/auth/verify-reset-token", { token })
         setIsValidToken(true)
       } catch (error) {
         setIsValidToken(false)

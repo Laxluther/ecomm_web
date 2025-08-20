@@ -1,7 +1,32 @@
 # Security files
 backend/.env
 backend/.env.*
+frontend/.env.local
+frontend/.env.production
 *.key
 *.pem
+*.p12
 credentials.json
 *.log
+
+# Sensitive configuration
+config.production.py
+secrets/
+certificates/
+
+# Database backup files
+*.sql
+*.dump
+dump.rdb
+
+# Server configuration
+nginx.conf
+apache.conf
+*.cert
+*.crt
+
+# IDE and system files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

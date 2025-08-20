@@ -33,8 +33,19 @@ def create_app():
     
 
   
+    # Security headers - Enhanced configuration
     if not app.debug:
-        Talisman(app, force_https=True)
+        Talisman(app, 
+                force_https=True,
+                strict_transport_security=True,
+                content_security_policy={
+                    'default-src': "'self'",
+                    'img-src': "'self' data: https:",
+                    'script-src': "'self'",
+                    'style-src': "'self' 'unsafe-inline'",
+                    'font-src': "'self' https:",
+                    'connect-src': "'self'"
+                })
     app.cache = cache
     
     # ADD WEBSOCKET MANAGER

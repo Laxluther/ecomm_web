@@ -9,11 +9,11 @@ import uuid
 
 class EmailService:
     def __init__(self):
-        self.smtp_server = 'smtp.gmail.com'
-        self.smtp_port = 587
+        self.smtp_server = getattr(Config, 'MAIL_SERVER', 'smtp.gmail.com')
+        self.smtp_port = getattr(Config, 'MAIL_PORT', 587)
         self.email = getattr(Config, 'MAIL_USERNAME', "sanidhyarana1@gmail.com")
         self.password = getattr(Config, 'MAIL_PASSWORD', "rxeysnootgqklxam")
-        self.sender_name = getattr(Config, 'COMPANY_NAME', 'YourStore')
+        self.sender_name = getattr(Config, 'COMPANY_NAME', 'WellnessNest')
         
         print(f"Email service initialized:")
         print(f"   SMTP: {self.smtp_server}:{self.smtp_port}")
@@ -115,7 +115,8 @@ class EmailService:
     
     def send_verification_email(self, user_email, user_name, user_id):
         token = self.generate_verification_token(user_id)
-        verification_url = f"http://localhost:5000/api/user/auth/verify-email/{token}"
+        backend_url = getattr(Config, 'BACKEND_BASE_URL', 'http://localhost:5000')
+        verification_url = f"{backend_url}/api/user/auth/verify-email/{token}"
         
         subject = f"Verify Your Email - {self.sender_name}"
         
@@ -185,7 +186,8 @@ class EmailService:
     
     def send_password_reset_email(self, user_email, user_name, user_id):
         token = self.generate_password_reset_token(user_id)
-        reset_url = f"http://localhost:5000/api/user/auth/reset-password/{token}"
+        backend_url = getattr(Config, 'BACKEND_BASE_URL', 'http://localhost:5000')
+        reset_url = f"{backend_url}/api/user/auth/reset-password/{token}"
         
         subject = f"Password Reset Request - {self.sender_name}"
         

@@ -803,6 +803,13 @@ def create_order(user_id):
             
             new_quantity = new_stock['quantity'] if new_stock else 0
             invalidate_product_cache(product_id, new_quantity)
+            
+            # Check for low stock and send alerts if needed
+            try:
+                from shared.inventory_alerts import send_low_stock_alert_for_product
+                send_low_stock_alert_for_product(product_id, new_quantity)
+            except Exception as e:
+                current_app.logger.error(f"Low stock alert error for product {product_id}: {str(e)}")
 
         
         
@@ -811,11 +818,38 @@ def create_order(user_id):
             DELETE FROM cart WHERE user_id = %s
         """, (user_id,))
         
+        # Send order confirmation email
+        try:
+            from shared.email_service import email_service
+            
+            # Get user details for email
+            user = execute_query("""
+                SELECT email, first_name, last_name FROM users WHERE user_id = %s
+            """, (user_id,), fetch_one=True)
+            
+            if user and current_app.config.get('SEND_ORDER_EMAILS', True):
+                # Send order confirmation email
+                email_sent = email_service.send_order_confirmation(
+                    order_id=order_id,
+                    user_email=user['email'],
+                    user_name=f"{user['first_name']} {user['last_name']}"
+                )
+                
+                if email_sent:
+                    current_app.logger.info(f"Order confirmation email sent for order {order_number}")
+                else:
+                    current_app.logger.warning(f"Failed to send confirmation email for order {order_number}")
+            
+        except Exception as e:
+            # Don't let email failure break the order process
+            current_app.logger.error(f"Email notification error for order {order_number}: {str(e)}")
+        
         return APIResponse.success({
             'order_id': order_id,
             'order_number': order_number,
             'status': 'pending',
-            'total_amount': total_amount
+            'total_amount': total_amount,
+            'confirmation_email_sent': True
         }, 'Order created successfully')
         
     except Exception as e:
