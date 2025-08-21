@@ -69,6 +69,12 @@ export default function AdminOrdersPage() {
   })
 
   const orders = Array.isArray(ordersData?.orders) ? ordersData.orders : []
+  
+  // Ensure all orders have valid numeric total_amount
+  const safeOrders = orders.map((order: Order) => ({
+    ...order,
+    total_amount: Number(order.total_amount) || 0
+  }))
   const totalPages = Math.ceil((ordersData?.total || 0) / 20)
 
   const handleViewOrder = (order: Order) => {
@@ -80,7 +86,7 @@ export default function AdminOrdersPage() {
   }
 
   // Filter orders by search term
-  const filteredOrders = orders.filter((order: Order) => {
+  const filteredOrders = safeOrders.filter((order: Order) => {
     const fullName = `${order.first_name || ''} ${order.last_name || ''}`.trim()
     const searchLower = searchTerm.toLowerCase()
     
@@ -129,12 +135,12 @@ export default function AdminOrdersPage() {
 
   // Stats calculations
   const stats = {
-    total: orders.length,
-    pending: orders.filter((o: Order) => o.status === "pending").length,
-    processing: orders.filter((o: Order) => ["confirmed", "processing"].includes(o.status)).length,
-    shipped: orders.filter((o: Order) => o.status === "shipped").length,
-    delivered: orders.filter((o: Order) => o.status === "delivered").length,
-    totalRevenue: orders.reduce((sum: number, o: Order) => sum + (o.total_amount || 0), 0),
+    total: safeOrders.length || 0,
+    pending: safeOrders.filter((o: Order) => o.status === "pending").length || 0,
+    processing: safeOrders.filter((o: Order) => ["confirmed", "processing"].includes(o.status)).length || 0,
+    shipped: safeOrders.filter((o: Order) => o.status === "shipped").length || 0,
+    delivered: safeOrders.filter((o: Order) => o.status === "delivered").length || 0,
+    totalRevenue: safeOrders.reduce((sum: number, o: Order) => sum + o.total_amount, 0) || 0,
   }
 
   if (isLoading) {
@@ -329,7 +335,7 @@ export default function AdminOrdersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{order.item_count || 0} items</TableCell>
-                      <TableCell className="font-medium">₹{(order.total_amount || 0).toFixed(2)}</TableCell>
+                      <TableCell className="font-medium">₹{order.total_amount.toFixed(2)}</TableCell>
                       <TableCell>
                         {order.created_at ? new Date(order.created_at).toLocaleDateString() : 'Unknown'}
                       </TableCell>

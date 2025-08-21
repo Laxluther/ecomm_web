@@ -1,19 +1,35 @@
 from shared.models import BaseModel, execute_query
 import random
 import string
+from datetime import datetime
 
 class ReferralModel(BaseModel):
     @staticmethod
     def generate_code(user_id):
-        base_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-        code = f"REF{base_code}"
-        
-        execute_query("""
-            INSERT INTO referral_codes (user_id, code, status, created_at)
-            VALUES (%s, %s, 'active', %s)
-        """, (user_id, code, ReferralModel.current_time()))
-        
-        return code
+        try:
+            base_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            code = f"REF{base_code}"
+            current_time = datetime.now()
+            
+            # Insert into referral_codes table
+            execute_query("""
+                INSERT INTO referral_codes (user_id, code, status, created_at)
+                VALUES (%s, %s, 'active', %s)
+            """, (user_id, code, current_time))
+            
+            # Update user's referral_code column for easy profile access
+            execute_query("""
+                UPDATE users SET referral_code = %s, updated_at = %s
+                WHERE user_id = %s
+            """, (code, current_time, user_id))
+            
+            print(f"Generated referral code {code} for user {user_id}")
+            return code
+        except Exception as e:
+            print(f"Error generating referral code for user {user_id}: {str(e)}")
+            # Return a simple code as fallback to prevent registration from failing
+            simple_code = f"REF{user_id[-6:].upper()}"
+            return simple_code
     
     @staticmethod
     def get_user_code(user_id):

@@ -740,7 +740,7 @@ def get_orders(admin_id):
     
     return jsonify({'orders': orders}), 200
 
-@admin_bp.route('/orders/<int:order_id>/status', methods=['PUT'])
+@admin_bp.route('/orders/<string:order_id>/status', methods=['PUT'])
 @admin_token_required
 def update_order_status(admin_id, order_id):
     data = request.get_json()

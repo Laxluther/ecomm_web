@@ -19,7 +19,7 @@ export default function ProfilePage() {
   const { data: walletData } = useQuery({
     queryKey: ["wallet"],
     queryFn: async () => {
-      const response = await api.get("/user/wallet")
+      const response = await api.get("/wallet")
       return response.data
     },
     enabled: isAuthenticated,
@@ -28,7 +28,7 @@ export default function ProfilePage() {
   const { data: referralData } = useQuery({
     queryKey: ["referrals"],
     queryFn: async () => {
-      const response = await api.get("/user/referrals")
+      const response = await api.get("/referrals")
       return response.data
     },
     enabled: isAuthenticated,

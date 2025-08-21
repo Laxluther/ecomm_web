@@ -65,7 +65,7 @@ export default function ProductDetailPage() {
     if (!product) return
 
     try {
-      await api.post("/user/cart/add", {
+      await api.post("/cart/add", {
         product_id: product.product_id,
         quantity,
       })

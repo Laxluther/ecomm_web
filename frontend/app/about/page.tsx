@@ -12,11 +12,10 @@ export default function AboutPage() {
       <div className="container mx-auto px-4 py-16">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 mb-6">About lorem ipsum</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-6">About WellnessNest Coffee</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            We're passionate about bringing you the finest natural products directly from pristine forests and organic
-            farms. Our mission is to connect you with nature's purest offerings while supporting sustainable farming
-            practices.
+            We're passionate about bringing you the finest premium coffee beans from the world's best coffee-growing regions. 
+            Our mission is to deliver exceptional coffee experiences while supporting sustainable farming practices and fair trade.
           </p>
         </div>
 
@@ -26,22 +25,22 @@ export default function AboutPage() {
             <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Story</h2>
             <div className="space-y-4 text-gray-600">
               <p>
-                Founded in 2020, lorem ipsum began as a small family business with a simple vision: to share the
-                incredible bounty of nature with health-conscious consumers who value quality and authenticity.
+                Founded in 2020, WellnessNest Coffee began as a small family business with a simple vision: to bring 
+                the world's finest coffee experiences to passionate coffee lovers who value quality and authenticity.
               </p>
               <p>
-                Our journey started when our founder discovered the amazing health benefits of raw forest honey during a
-                trek in the Western Ghats. This experience sparked a passion for sourcing the finest natural products
-                directly from their origins.
+                Our journey started when our founder discovered exceptional single-origin coffee beans during a trip to 
+                Ethiopian coffee farms. This experience sparked a passion for sourcing premium coffee directly from 
+                the best growing regions around the world.
               </p>
               <p>
-                Today, we work with over 100 small-scale farmers and forest communities across India, ensuring fair
-                trade practices and sustainable harvesting methods that protect our precious ecosystems.
+                Today, we work with coffee farmers from Ethiopia, Colombia, Jamaica, and India, ensuring fair
+                trade practices and sustainable farming methods that support both the environment and farming communities.
               </p>
             </div>
           </div>
           <div className="relative h-96 rounded-lg overflow-hidden">
-            <Image src="/images/hero-banner-1.png" alt="Forest landscape" fill className="object-cover" />
+            <Image src="/images/hero-banner-1.png" alt="Coffee plantation" fill className="object-cover" />
           </div>
         </div>
 

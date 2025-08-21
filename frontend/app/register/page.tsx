@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -31,6 +31,7 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [userEmail, setUserEmail] = useState("")
+  const [redirectCountdown, setRedirectCountdown] = useState(5)
   const [referralValidation, setReferralValidation] = useState<{
     isValid: boolean | null
     message: string
@@ -123,6 +124,24 @@ export default function RegisterPage() {
     }
   }
 
+  // Auto-redirect to login after successful registration with countdown
+  useEffect(() => {
+    if (registrationSuccess) {
+      const interval = setInterval(() => {
+        setRedirectCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(interval)
+            router.push('/login?message=Please check your email to verify your account')
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+
+      return () => clearInterval(interval)
+    }
+  }, [registrationSuccess, router])
+
   if (registrationSuccess) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -156,9 +175,12 @@ export default function RegisterPage() {
                     {isLoading ? "Sending..." : "Resend Verification Email"}
                   </Button>
 
-                  <div className="text-center">
+                  <div className="text-center space-y-2">
+                    <p className="text-sm text-gray-500">
+                      Redirecting to login in {redirectCountdown} seconds...
+                    </p>
                     <Link href="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
-                      Back to Login
+                      Go to Login Now
                     </Link>
                   </div>
                 </div>

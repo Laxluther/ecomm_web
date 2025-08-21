@@ -22,7 +22,7 @@ export default function ReferralsPage() {
   const { data: referralData, isLoading } = useQuery({
     queryKey: ["referrals"],
     queryFn: async () => {
-      const response = await api.get("/user/referrals")
+      const response = await api.get("/referrals")
       return response.data
     },
     enabled: isAuthenticated,
@@ -31,7 +31,7 @@ export default function ReferralsPage() {
   const { data: wishlistData } = useQuery({
     queryKey: ["wishlist"],
     queryFn: async () => {
-      const response = await api.get("/user/wishlist")
+      const response = await api.get("/wishlist")
       return response.data
     },
     enabled: isAuthenticated,

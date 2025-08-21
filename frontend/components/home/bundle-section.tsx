@@ -9,43 +9,24 @@ export function BundleSection() {
     <section className="py-16 bg-gradient-to-b from-green-50 to-white">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Experience the Power of Nature</h2>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Experience Premium Coffee</h2>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Join thousands of satisfied customers who have transformed their daily routine
+            Join thousands of coffee enthusiasts who have elevated their daily coffee experience
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Bundle Card 1 */}
+          {/* Single Origin Coffee */}
           <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
             <div className="aspect-square relative">
-              <Image src="/placeholder.svg?height=300&width=300" alt="Honey Bundle" fill className="object-cover" />
-            </div>
-            <CardContent className="p-6">
-              <div className="flex items-center mb-3">
-                <Leaf className="h-5 w-5 text-amber-600 mr-2" />
-                <h3 className="font-semibold text-lg">Honey Collection</h3>
-              </div>
-              <p className="text-gray-600 mb-4">Our premium honey selection sourced from pristine farms.</p>
-              <Button asChild variant="outline" className="w-full">
-                <Link href="/shop?category=1">
-                  Explore <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Bundle Card 2 */}
-          <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
-            <div className="aspect-square relative">
-              <Image src="/placeholder.svg?height=300&width=300" alt="Coffee Bundle" fill className="object-cover" />
+              <Image src="/placeholder.svg?height=300&width=300" alt="Single Origin Coffee" fill className="object-cover" />
             </div>
             <CardContent className="p-6">
               <div className="flex items-center mb-3">
                 <Coffee className="h-5 w-5 text-amber-600 mr-2" />
-                <h3 className="font-semibold text-lg">Coffee Selection</h3>
+                <h3 className="font-semibold text-lg">Single Origin</h3>
               </div>
-              <p className="text-gray-600 mb-4">Premium coffee beans for the perfect morning ritual.</p>
+              <p className="text-gray-600 mb-4">Exceptional single-origin beans with unique flavor profiles.</p>
               <Button asChild variant="outline" className="w-full">
                 <Link href="/shop?category=2">
                   Explore <ArrowRight className="ml-2 h-4 w-4" />
@@ -54,20 +35,39 @@ export function BundleSection() {
             </CardContent>
           </Card>
 
-          {/* Bundle Card 3 */}
+          {/* Premium Blends */}
           <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
             <div className="aspect-square relative">
-              <Image src="/placeholder.svg?height=300&width=300" alt="Custom Bundle" fill className="object-cover" />
+              <Image src="/placeholder.svg?height=300&width=300" alt="Premium Blends" fill className="object-cover" />
+            </div>
+            <CardContent className="p-6">
+              <div className="flex items-center mb-3">
+                <Coffee className="h-5 w-5 text-amber-600 mr-2" />
+                <h3 className="font-semibold text-lg">Premium Blends</h3>
+              </div>
+              <p className="text-gray-600 mb-4">Expertly crafted blends for the perfect cup every time.</p>
+              <Button asChild variant="outline" className="w-full">
+                <Link href="/shop?category=2">
+                  Explore <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Specialty Coffee */}
+          <Card className="overflow-hidden hover:shadow-lg transition-shadow duration-300">
+            <div className="aspect-square relative">
+              <Image src="/placeholder.svg?height=300&width=300" alt="Specialty Coffee" fill className="object-cover" />
             </div>
             <CardContent className="p-6">
               <div className="flex items-center mb-3">
                 <Package className="h-5 w-5 text-amber-600 mr-2" />
-                <h3 className="font-semibold text-lg">Custom Bundle</h3>
+                <h3 className="font-semibold text-lg">Specialty Coffee</h3>
               </div>
-              <p className="text-gray-600 mb-4">Create your perfect combination of our premium products.</p>
+              <p className="text-gray-600 mb-4">Rare and exotic coffee beans for true connoisseurs.</p>
               <Button asChild className="w-full bg-amber-700 hover:bg-amber-800">
                 <Link href="/shop">
-                  Build Your Bundle <ArrowRight className="ml-2 h-4 w-4" />
+                  Discover Specialty <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </CardContent>

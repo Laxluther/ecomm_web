@@ -26,9 +26,14 @@ def validate_password_strength(password):
 def register():
     data = request.get_json()
     
+    # Debug logging
+    print(f"Registration attempt with data: {data}")
+    
     required_fields = ['email', 'password', 'first_name', 'last_name', 'phone']
-    if not all(field in data for field in required_fields):
-        return jsonify({'error': 'Missing required fields'}), 400
+    missing_fields = [field for field in required_fields if field not in data or not data.get(field)]
+    if missing_fields:
+        print(f"Missing required fields: {missing_fields}")
+        return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
     
     email = bleach.clean(data['email'].lower().strip(), tags=[], attributes={}, strip=True)
     password = data.get('password', '')
@@ -36,20 +41,25 @@ def register():
     last_name = bleach.clean(data['last_name'].strip(), tags=[], attributes={}, strip=True)
     phone = bleach.clean(data['phone'].strip(), tags=[], attributes={}, strip=True)
 
-    # Add validation:
+    # Add validation with debug logging:
     if len(email) > 254:
+        print(f"Email too long: {len(email)} characters")
         return jsonify({'error': 'Email address too long'}), 400
     if len(first_name) < 2 or len(first_name) > 50:
+        print(f"Invalid first name length: '{first_name}' ({len(first_name)} chars)")
         return jsonify({'error': 'First name must be 2-50 characters'}), 400
     if len(last_name) < 2 or len(last_name) > 50:
+        print(f"Invalid last name length: '{last_name}' ({len(last_name)} chars)")
         return jsonify({'error': 'Last name must be 2-50 characters'}), 400
     if not re.match(r'^[6-9]\d{9}$', phone):
+        print(f"Invalid phone format: '{phone}'")
         return jsonify({'error': 'Invalid Indian phone number format'}), 400
 
     try:
         valid_email = validate_email(email)
         email = valid_email.email
-    except EmailNotValidError:
+    except EmailNotValidError as e:
+        print(f"Email validation failed: {email} - {str(e)}")
         return jsonify({'error': 'Invalid email format'}), 400
     referral_code = data.get('referral_code', '').strip()
     
@@ -58,6 +68,7 @@ def register():
     
     is_strong, password_error = validate_password_strength(password)
     if not is_strong:
+        print(f"Password validation failed: {password_error}")
         return jsonify({'error': password_error}), 400
     
     existing_user = UserModel.get_by_email(email)
@@ -72,9 +83,27 @@ def register():
     password_hash = generate_password_hash(password)
     user_id = UserModel.create(email, password_hash, first_name, last_name, phone, referral_code)
     
-    ReferralModel.generate_code(user_id)
+    # Generate referral code with error handling
+    try:
+        generated_code = ReferralModel.generate_code(user_id)
+        print(f"Referral code generated: {generated_code}")
+    except Exception as e:
+        print(f"Failed to generate referral code for user {user_id}: {str(e)}")
+        # Continue with registration even if referral code generation fails
     
-    email_sent = email_service.send_verification_email(email, first_name, user_id)
+    # Send verification email asynchronously (don't make user wait)
+    import threading
+    
+    def send_email_async():
+        try:
+            email_service.send_verification_email(email, first_name, user_id)
+            print(f"Verification email sent successfully to {email}")
+        except Exception as e:
+            print(f"Background email error for {email}: {str(e)}")
+    
+    # Start email sending in background thread
+    threading.Thread(target=send_email_async, daemon=True).start()
+    email_sent = True  # Assume success, handle errors in background
     
     return jsonify({
         'message': 'Registration successful! Please check your email to verify your account.',

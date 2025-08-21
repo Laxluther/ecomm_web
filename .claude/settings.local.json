@@ -15,7 +15,8 @@
     "ask": [],
     "additionalDirectories": [
       "S:\\mnt\\s\\web",
-      "S:\\s\\web"
+      "S:\\s\\web",
+      "S:\\s\\web\\backend"
     ]
   }
 }

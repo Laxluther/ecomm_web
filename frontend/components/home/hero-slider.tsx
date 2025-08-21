@@ -19,16 +19,16 @@ export function HeroSlider() {
   const slides: Slide[] = [
     {
       image: "/images/hero-banner-1.png",
-      title: "Pure farm Treasures",
-      subtitle: "Discover nature's finest honey, coffee, nuts and seeds sourced directly from pristine farms.",
-      cta: "Explore Collection",
+      title: "Premium Coffee Collection",
+      subtitle: "Discover the world's finest coffee beans sourced directly from the best growing regions.",
+      cta: "Explore Coffee",
       link: "/shop",
     },
     {
       image: "/images/hero-banner-2.png",
-      title: "From farm to Your Table",
-      subtitle: "Experience the authentic taste of nature with our premium organic products.",
-      cta: "Shop Now",
+      title: "From Bean to Cup",
+      subtitle: "Experience exceptional coffee with our carefully curated selection of premium single-origin beans.",
+      cta: "Shop Coffee",
       link: "/shop",
     },
   ]
