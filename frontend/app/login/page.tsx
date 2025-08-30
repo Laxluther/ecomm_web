@@ -28,8 +28,11 @@ export default function LoginPage() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("")
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false)
   const [emailNotVerified, setEmailNotVerified] = useState(false)
-  const { login } = useAuth()
+  const { login, hasHydrated } = useAuth()
   const router = useRouter()
+  
+  // Debug hydration state
+  console.log("Login component - hasHydrated:", hasHydrated)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -37,9 +40,31 @@ export default function LoginPage() {
     setEmailNotVerified(false)
 
     try {
+      console.log("Attempting login with:", { email, password: "***", rememberMe })
       const response = await authAPI.login(email, password, rememberMe)
+      console.log("Login API response:", response)
+      
       const { token, user } = response
+      console.log("Extracted token:", token ? "***" : "null")
+      console.log("Extracted user:", user)
+      
+      if (!token || !user) {
+        throw new Error("Invalid response: missing token or user data")
+      }
+      
+      // Ensure auth store is hydrated before login
+      if (!hasHydrated) {
+        console.warn("Auth store not hydrated, waiting...")
+        await new Promise(resolve => setTimeout(resolve, 200))
+      }
+      
+      // Call login and wait a tick for state to update
+      console.log("Calling login function...")
       login(token, user)
+      
+      // Add a small delay to ensure state is updated
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
       toast.success("Login successful! Welcome back!")
       router.push("/")
     } catch (error: any) {

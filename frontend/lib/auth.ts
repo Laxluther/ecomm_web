@@ -59,15 +59,22 @@ const useAuthStore = create<AuthState>()(
 
       // User actions
       login: (token: string, user: User) => {
+        console.log("Auth store login called with:", { token: token ? "***" : "null", user })
         if (typeof window !== "undefined") {
-          localStorage.setItem("token", token)
-          localStorage.setItem("user", JSON.stringify(user))
+          try {
+            localStorage.setItem("token", token)
+            localStorage.setItem("user", JSON.stringify(user))
+            console.log("Successfully saved to localStorage")
+          } catch (error) {
+            console.error("Failed to save to localStorage:", error)
+          }
         }
         set({
           token,
           user,
           isAuthenticated: true,
         })
+        console.log("Auth state updated successfully")
       },
 
       logout: () => {

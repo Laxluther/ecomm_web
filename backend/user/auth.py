@@ -116,11 +116,17 @@ def register():
 def login():
     data = request.get_json()
     
+    # Debug logging
+    print(f"Login attempt - Raw data received: {data}")
+    
     if not data.get('email') or not data.get('password'):
+        print("Missing email or password in request")
         return jsonify({'error': 'Email and password required'}), 400
     
     email = bleach.clean(data['email'].lower().strip(), tags=[], attributes={}, strip=True)
     password = data.get('password', '')
+    
+    print(f"Processed email: '{email}', password length: {len(password)}")
     if len(email) > 254:
         return jsonify({'error': 'Email too long'}), 400
     try:
@@ -132,7 +138,15 @@ def login():
     
     user = UserModel.get_by_email(email)
     
+    print(f"User found: {bool(user)}")
+    if user:
+        print(f"User email: {user['email']}, status: {user['status']}")
+        password_valid = check_password_hash(user['password_hash'], password)
+        print(f"Password valid: {password_valid}")
+        print(f"Hash starts with: {user['password_hash'][:20]}...")
+    
     if not user or not check_password_hash(user['password_hash'], password):
+        print("Authentication failed - returning 401")
         return jsonify({'error': 'Invalid credentials'}), 401
     
     # Temporarily bypass email verification for testing
