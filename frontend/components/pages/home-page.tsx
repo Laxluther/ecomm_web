@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
+import Image from "next/image"
 import { ArrowRight, Truck, Shield, Headphones, Gift, Leaf, Coffee, Nut, Wheat } from "lucide-react"
 import { productsAPI, categoriesAPI } from "@/lib/api"
 import { HeroSlider } from "@/components/home/hero-slider"
@@ -53,7 +54,7 @@ export function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
+      <Header transparent />
 
       {/* Hero Slider */}
       <HeroSlider />

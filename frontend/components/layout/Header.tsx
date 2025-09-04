@@ -13,7 +13,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/components/ui/badge"
 import Image from "next/image"
 
-export function Header() {
+interface HeaderProps {
+  transparent?: boolean
+}
+
+export function Header({ transparent = false }: HeaderProps) {
   const { user, isAuthenticated, logout } = useAuth()
   const { getTotalItems } = useCartStore()
   const [searchQuery, setSearchQuery] = useState("")
@@ -48,10 +52,10 @@ export function Header() {
   const cartItemsCount = isClient ? getTotalItems() : 0
 
   return (
-    <header className="bg-transparent absolute top-0 left-0 right-0 z-50">
-      {/* Premium Banner - Only show after client hydration */}
+    <header className={`fixed top-0 left-0 right-0 z-50 ${transparent ? 'bg-transparent' : 'bg-white/95 backdrop-blur-sm border-b border-gray-200'}`}>
+      {/* Premium Banner */}
       {isClient && showPremiumBanner && (
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-2 px-4 relative">
+        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-2 px-4">
           <div className="container mx-auto text-center">
             <div className="flex items-center justify-center space-x-2">
               <Crown className="h-4 w-4" />
@@ -72,37 +76,40 @@ export function Header() {
         </div>
       )}
       
-      {/* Main Header */}
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-20">
-          
+      {/* Navigation Bar */}
+      <div className="px-4 py-3">
+        <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center absolute top-4 left-4 select-none">
-            <div className="relative w-72 h-36">
+          <Link href="/" className="flex items-center select-none">
+            <div className="relative w-40 h-16 select-none">
               <Image 
                 src="/images/welnest-logo.png" 
                 alt="WellNest Logo" 
                 fill 
-                className="object-contain select-none pointer-events-none" 
+                className="object-contain select-none" 
                 draggable={false}
+                style={{userSelect: 'none', WebkitUserSelect: 'none', MozUserSelect: 'none', pointerEvents: 'none'}}
+                unselectable="on"
+                onDragStart={(e) => e.preventDefault()}
+                onContextMenu={(e) => e.preventDefault()}
               />
             </div>
           </Link>
 
-          {/* Right Side Navigation and Icons */}
-          <div className="flex items-center space-x-8 absolute top-6 right-6">
+          {/* Navigation Links */}
+          <div className="flex items-center space-x-8">
             {/* About Us and Contact Links */}
-            <Link href="/about" className="text-white hover:text-green-400 font-bold text-xl transition-colors">
+            <Link href="/about" className={`font-bold text-xl transition-colors ${transparent ? 'text-white hover:text-green-400' : 'text-gray-900 hover:text-emerald-600'}`}>
               About Us
             </Link>
-            <Link href="/contact" className="text-white hover:text-green-400 font-bold text-xl transition-colors">
+            <Link href="/contact" className={`font-bold text-xl transition-colors ${transparent ? 'text-white hover:text-green-400' : 'text-gray-900 hover:text-emerald-600'}`}>
               Contact
             </Link>
 
             {/* Wishlist */}
             {isClient && isAuthenticated && (
               <Link href="/wishlist">
-                <Button variant="ghost" size="lg" className="relative text-white hover:text-green-400">
+                <Button variant="ghost" size="lg" className={`relative ${transparent ? 'text-white hover:text-green-400' : 'text-gray-900 hover:text-emerald-600'}`}>
                   <Heart className="h-7 w-7" />
                 </Button>
               </Link>
@@ -110,7 +117,7 @@ export function Header() {
 
             {/* Cart */}
             <Link href="/cart">
-              <Button variant="ghost" size="lg" className="relative text-white hover:text-green-400">
+              <Button variant="ghost" size="lg" className={`relative ${transparent ? 'text-white hover:text-green-400' : 'text-gray-900 hover:text-emerald-600'}`}>
                 <ShoppingCart className="h-7 w-7" />
                 {isClient && cartItemsCount > 0 && (
                   <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-emerald-600">
@@ -124,7 +131,7 @@ export function Header() {
             {isClient && isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="lg" className="text-white hover:text-green-400">
+                  <Button variant="ghost" size="lg" className={`${transparent ? 'text-white hover:text-green-400' : 'text-gray-900 hover:text-emerald-600'}`}>
                     <User className="h-7 w-7" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -157,7 +164,7 @@ export function Header() {
               isClient && (
                 <div className="flex items-center space-x-2">
                   <Link href="/login">
-                    <Button variant="outline" size="sm">
+                    <Button variant="outline" size="sm" className={transparent ? 'border-white text-white hover:bg-white hover:text-gray-900' : ''}>
                       Login
                     </Button>
                   </Link>

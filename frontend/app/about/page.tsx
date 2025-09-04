@@ -3,39 +3,40 @@ import { Footer } from "@/components/layout/footer"
 import { Card, CardContent } from "@/components/ui/card"
 import { Leaf, Heart, Users, Award, TreePine } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-
-      <div className="container mx-auto px-4 py-16">
+      
+      <div className="container mx-auto px-4 pt-32 pb-16">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl font-bold text-gray-900 mb-6">About WellnessNest Coffee</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-6">About WellNest</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            We're passionate about bringing you the finest premium coffee beans from the world's best coffee-growing regions. 
-            Our mission is to deliver exceptional coffee experiences while supporting sustainable farming practices and fair trade.
+            At WELLNEST, we believe true health comes from living in harmony with nature.
+            Our mission is to bring you pure, naturally crafted, and wholesome products that fit seamlessly into a healthy lifestyle — without breaking the bank.
           </p>
         </div>
 
         {/* Story Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Story</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-6">Our Vision</h2>
             <div className="space-y-4 text-gray-600">
               <p>
-                Founded in 2020, WellnessNest Coffee began as a small family business with a simple vision: to bring 
-                the world's finest coffee experiences to passionate coffee lovers who value quality and authenticity.
+                <strong>WellNest is a startup in planning phase</strong> — we're building something special from the ground up. 
+                Our vision is to become a trusted global name for natural wellness solutions that inspire people to live 
+                healthier, happier, and more mindful lives — one choice at a time.
               </p>
               <p>
-                Our journey started when our founder discovered exceptional single-origin coffee beans during a trip to 
-                Ethiopian coffee farms. This experience sparked a passion for sourcing premium coffee directly from 
-                the best growing regions around the world.
+                From energizing coffee and revitalizing honey to nutrient-rich snacks, our planned range is designed to 
+                fuel your body, uplift your spirit, and support your well-being every single day.
               </p>
               <p>
-                Today, we work with coffee farmers from Ethiopia, Colombia, Jamaica, and India, ensuring fair
-                trade practices and sustainable farming methods that support both the environment and farming communities.
+                We're currently developing partnerships with ethical suppliers and preparing to launch our first collection 
+                of premium natural products that embody our motto: <em>"Fuel Your Body, Feed Your Soul — Naturally."</em>
               </p>
             </div>
           </div>
@@ -89,27 +90,6 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* Stats Section */}
-        <div className="bg-emerald-800 text-white rounded-lg p-12 mb-16">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold mb-2">100+</div>
-              <div className="text-emerald-200">Partner Farmers</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">50,000+</div>
-              <div className="text-emerald-200">Happy Customers</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">20+</div>
-              <div className="text-emerald-200">Premium Products</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold mb-2">5</div>
-              <div className="text-emerald-200">Years of Excellence</div>
-            </div>
-          </div>
-        </div>
 
         {/* Mission Section */}
         <div className="text-center mb-16">
