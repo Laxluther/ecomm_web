@@ -27,7 +27,7 @@ export function ProductGrid({ products }: ProductGridProps) {
   const { addItem } = useCartStore()
   const { isAuthenticated } = useAuth()
 
-  const handleAddToCart = async (product: Product) => {
+  const handleAddToCart = async (product: Product, quantity: number) => {
     if (!isAuthenticated) {
       toast.error("Please login to add items to cart")
       return
@@ -39,23 +39,29 @@ export function ProductGrid({ products }: ProductGridProps) {
       return
     }
 
+    // Check if requested quantity exceeds available stock
+    if (product.stock_quantity && quantity > product.stock_quantity) {
+      toast.error(`Only ${product.stock_quantity} items available in stock`)
+      return
+    }
+
     try {
       await api.post("/cart/add", {
         product_id: product.product_id,
-        quantity: 1,
+        quantity: quantity,
       })
 
       addItem({
         cart_id: Date.now(),
         product_id: product.product_id,
         product_name: product.product_name,
-        quantity: 1,
+        quantity: quantity,
         price: product.price,
         discount_price: product.discount_price,
         image_url: product.primary_image,
       })
 
-      toast.success(`${product.product_name} added to cart!`)
+      toast.success(`${quantity} x ${product.product_name} added to cart!`)
     } catch (error: any) {
       console.error("Error adding item to cart:", error)
       
@@ -108,7 +114,7 @@ export function ProductGrid({ products }: ProductGridProps) {
         <ProductCard 
           key={product.product_id} 
           product={product} 
-          onAddToCart={() => handleAddToCart(product)} 
+          onAddToCart={(quantity) => handleAddToCart(product, quantity)} 
         />
       ))}
     </div>

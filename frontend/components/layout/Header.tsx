@@ -23,6 +23,7 @@ export function Header({ transparent = false }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [showPremiumBanner, setShowPremiumBanner] = useState(true)
   const [isClient, setIsClient] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
 
   // Fix hydration: Only run client-side code after hydration
   useEffect(() => {
@@ -32,6 +33,14 @@ export function Header({ transparent = false }: HeaderProps) {
     if (dismissed) {
       setShowPremiumBanner(false)
     }
+
+    // Handle scroll for sticky navbar
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 0)
+    }
+
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
   const handleSearch = (e: React.FormEvent) => {
@@ -52,7 +61,20 @@ export function Header({ transparent = false }: HeaderProps) {
   const cartItemsCount = isClient ? getTotalItems() : 0
 
   return (
-    <header className={`fixed top-0 left-0 right-0 z-50 ${transparent ? 'bg-transparent' : 'bg-white/95 backdrop-blur-sm border-b border-gray-200'}`}>
+    <div 
+      className={`fixed top-0 left-0 right-0 z-50 ${
+        transparent 
+          ? 'bg-transparent' 
+          : 'bg-white/95 backdrop-blur-sm border-b border-gray-200'
+      }`}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50
+      }}
+    >
       {/* Premium Banner */}
       {isClient && showPremiumBanner && (
         <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-2 px-4">
@@ -179,6 +201,6 @@ export function Header({ transparent = false }: HeaderProps) {
           </div>
         </div>
       </div>
-    </header>
+    </div>
   )
 }

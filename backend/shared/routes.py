@@ -70,7 +70,9 @@ def public_product_detail(product_id):
         SELECT p.*, c.category_name,
                (SELECT pi.image_url FROM product_images pi 
                 WHERE pi.product_id = p.product_id AND pi.is_primary = 1 
-                LIMIT 1) as primary_image
+                LIMIT 1) as primary_image,
+               (SELECT i.quantity FROM inventory i 
+                WHERE i.product_id = p.product_id) as stock_quantity
         FROM products p 
         LEFT JOIN categories c ON p.category_id = c.category_id
         WHERE p.product_id = %s AND p.status = 'active'
@@ -87,14 +89,53 @@ def public_product_detail(product_id):
         ORDER BY sort_order, is_primary DESC
     """, (product_id,), fetch_all=True)
     
+    # Get reviews and ratings
+    reviews = execute_query("""
+        SELECT r.review_id, r.rating, r.title, r.comment, r.created_at,
+               r.helpful_count, u.first_name, u.last_name,
+               CONCAT(u.first_name, ' ', u.last_name) as user_name
+        FROM reviews r
+        LEFT JOIN users u ON r.user_id = u.user_id
+        WHERE r.product_id = %s AND r.status = 'approved'
+        ORDER BY r.created_at DESC
+    """, (product_id,), fetch_all=True)
+    
+    # Calculate rating statistics
+    rating_stats = execute_query("""
+        SELECT 
+            COALESCE(AVG(rating), 0) as average,
+            COUNT(*) as total_reviews
+        FROM reviews 
+        WHERE product_id = %s AND status = 'approved'
+    """, (product_id,), fetch_one=True)
+    
     # Convert image URLs to absolute URLs
     product = convert_product_images(product)
     for img in images:
         img['image_url'] = convert_image_url(img['image_url'])
     
-    product['images'] = images
+    # Format reviews dates
+    for review in reviews:
+        if review.get('created_at'):
+            review['created_at'] = review['created_at'].strftime('%B %d, %Y')
     
-    return jsonify({'product': product}), 200
+    # Add stock status
+    product['in_stock'] = (product.get('stock_quantity') or 0) > 0
+    
+    # Ensure proper data structure
+    product['images'] = images
+    product['reviews'] = reviews
+    product['rating'] = {
+        'average': round(float(rating_stats.get('average', 0)), 1),
+        'total_reviews': rating_stats.get('total_reviews', 0)
+    }
+    
+    return jsonify({
+        'product': product,
+        'images': images,
+        'reviews': reviews,
+        'rating': product['rating']
+    }), 200
 
 @shared_bp.route('/states', methods=['GET'])
 def get_indian_states():

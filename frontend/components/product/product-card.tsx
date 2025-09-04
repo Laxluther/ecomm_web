@@ -5,7 +5,7 @@ import type React from "react"
 import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
-import { ShoppingCart, Star, Heart } from "lucide-react"
+import { ShoppingCart, Star, Heart, Plus, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
@@ -28,13 +28,14 @@ interface Product {
 
 interface ProductCardProps {
   product: Product
-  onAddToCart: () => void
+  onAddToCart: (quantity: number) => void
 }
 
 export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const { isAuthenticated } = useAuth()
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [isWishlistLoading, setIsWishlistLoading] = useState(false)
+  const [quantity, setQuantity] = useState(1)
 
   // Convert prices to numbers to ensure proper calculations
   const price = typeof product.price === "string" ? Number.parseFloat(product.price) : product.price
@@ -61,7 +62,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
       return
     }
 
-    onAddToCart()
+    onAddToCart(quantity)
   }
 
   const handleWishlistToggle = async () => {
@@ -173,6 +174,36 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
             </div>
           )}
 
+          {/* Quantity Selector - Only show when in stock */}
+          {isInStock && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-sm mb-2">
+                <span className="text-gray-600">Quantity:</span>
+              </div>
+              <div className="flex items-center justify-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                  disabled={quantity <= 1}
+                  className="h-8 w-8 p-0"
+                >
+                  <Minus className="h-3 w-3" />
+                </Button>
+                <span className="w-12 text-center font-medium text-sm">{quantity}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setQuantity(Math.min(stockQuantity, quantity + 1))}
+                  disabled={quantity >= stockQuantity}
+                  className="h-8 w-8 p-0"
+                >
+                  <Plus className="h-3 w-3" />
+                </Button>
+              </div>
+            </div>
+          )}
+
           <Button
             onClick={handleAddToCart}
             disabled={!isInStock}
@@ -184,7 +215,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
             size="sm"
           >
             <ShoppingCart className="h-4 w-4 mr-2" />
-            {isInStock ? "Add to Cart" : "Out of Stock"}
+            {isInStock ? `Add ${quantity} to Cart` : "Out of Stock"}
           </Button>
         </div>
       </CardContent>

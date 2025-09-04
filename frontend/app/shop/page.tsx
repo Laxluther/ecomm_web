@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { useSearchParams, useRouter } from "next/navigation"
+import { Header } from "@/components/layout/header"
 import { Footer } from "@/components/layout/footer"
 import { ProductGrid } from "@/components/product/product-grid"
 import { Button } from "@/components/ui/button"
@@ -122,7 +123,8 @@ export default function ShopPage() {
   if (productsError) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-4 py-8">
+        <Header />
+        <div className="container mx-auto px-4 pt-32 pb-8">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Unable to Load Products</h1>
             <p className="text-gray-600 mb-4">
@@ -142,7 +144,8 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+      <Header />
+      <div className="container mx-auto px-4 pt-32 pb-8">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Filters Sidebar */}
           <div className="lg:w-1/4">

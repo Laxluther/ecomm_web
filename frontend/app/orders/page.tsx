@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Package, Truck, CheckCircle, Clock, Eye, AlertCircle } from "lucide-react"
+import { Package, Truck, CheckCircle, Clock, AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth"
 import { ordersAPI } from "@/lib/api"
 import Link from "next/link"
@@ -247,12 +247,6 @@ export default function OrdersPage() {
                         Status: <span className="capitalize font-medium">{order.status}</span>
                       </span>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
-                      <Link href={`/orders/${order.order_id}`}>
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Details
-                      </Link>
-                    </Button>
                   </div>
                 </CardContent>
               </Card>

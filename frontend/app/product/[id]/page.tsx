@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import { ShoppingCart, Star, Minus, Plus, Heart, Share2, Truck, Shield, RotateCcw } from "lucide-react"
 import { useCartStore } from "@/lib/store"
 import { useAuth } from "@/lib/auth"
+import { publicApi } from "@/lib/api"
 import api from "@/lib/api"
 import toast from "react-hot-toast"
 const getNumericValue = (value: any): number => {
@@ -46,7 +47,7 @@ export default function ProductDetailPage() {
   const { data: productData, isLoading } = useQuery({
     queryKey: ["product", productId],
     queryFn: async () => {
-      const response = await api.get(`/products/${productId}`)
+      const response = await publicApi.get(`/public/products/${productId}`)
       return response.data
     },
   })
@@ -55,6 +56,11 @@ export default function ProductDetailPage() {
   const images = productData?.images || []
   const reviews = productData?.reviews || []
   const rating = productData?.rating || { average: 0, total_reviews: 0 }
+
+  // Debug logging
+  console.log('Product data:', productData)
+  console.log('Images:', images)
+  console.log('Product:', product)
 
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
@@ -164,8 +170,8 @@ const discountPercentage = productPrice > 0 && productDiscountPrice > 0
           <div className="space-y-4">
             <div className="aspect-square relative overflow-hidden rounded-lg bg-white">
               <Image
-                src={images[selectedImage]?.image_url || "/placeholder.svg?height=600&width=600"}
-                alt={product.product_name}
+                src={images && images[selectedImage]?.image_url || product?.primary_image || "/placeholder.svg?height=600&width=600"}
+                alt={product?.product_name || "Product image"}
                 fill
                 className="object-cover"
               />
@@ -174,11 +180,11 @@ const discountPercentage = productPrice > 0 && productDiscountPrice > 0
               )}
             </div>
 
-            {images.length > 1 && (
+            {images && images.length > 1 && (
               <div className="grid grid-cols-4 gap-2">
                 {images.map((image: any, index: number) => (
                   <button
-                    key={image.image_id}
+                    key={image.image_id || index}
                     onClick={() => setSelectedImage(index)}
                     className={`aspect-square relative overflow-hidden rounded border-2 ${
                       selectedImage === index ? "border-amber-600" : "border-gray-200"
@@ -186,7 +192,7 @@ const discountPercentage = productPrice > 0 && productDiscountPrice > 0
                   >
                     <Image
                       src={image.image_url || "/placeholder.svg"}
-                      alt={image.alt_text}
+                      alt={image.alt_text || `Product image ${index + 1}`}
                       fill
                       className="object-cover"
                     />
