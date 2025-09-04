@@ -8,7 +8,7 @@ frontend/.env.production
 *.p12
 credentials.json
 *.log
-
+backend\venv
 # Sensitive configuration
 config.production.py
 secrets/
@@ -30,3 +30,4 @@ apache.conf
 Thumbs.db
 *.swp
 *.swo
+CLAUDE_RULES.md
