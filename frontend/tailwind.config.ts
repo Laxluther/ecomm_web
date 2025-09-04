@@ -18,6 +18,11 @@ const config: Config = {
       },
     },
     extend: {
+      fontFamily: {
+        'crimson': ['var(--font-crimson)', 'serif'],
+        'libre': ['var(--font-libre)', 'serif'],
+        'kablammo': ['var(--font-kablammo)', 'cursive'],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

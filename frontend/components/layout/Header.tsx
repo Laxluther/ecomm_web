@@ -48,7 +48,7 @@ export function Header() {
   const cartItemsCount = isClient ? getTotalItems() : 0
 
   return (
-    <header className="bg-white border-b border-gray-200">
+    <header className="bg-transparent absolute top-0 left-0 right-0 z-50">
       {/* Premium Banner - Only show after client hydration */}
       {isClient && showPremiumBanner && (
         <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white py-2 px-4 relative">
@@ -76,72 +76,42 @@ export function Header() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-20">
           
-          {/* Logo + Text - Bigger and Better */}
-          <Link href="/" className="flex items-center space-x-3">
-            <div className="relative w-16 h-14">
+          {/* Logo */}
+          <Link href="/" className="flex items-center absolute top-4 left-4 select-none">
+            <div className="relative w-72 h-36">
               <Image 
                 src="/images/welnest-logo.png" 
-                alt="WelNest Logo" 
+                alt="WellNest Logo" 
                 fill 
-                className="object-contain" 
+                className="object-contain select-none pointer-events-none" 
+                draggable={false}
               />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-2xl text-emerald-800 tracking-wide">WelNest</span>
-              <span className="text-sm text-emerald-600 -mt-1 font-medium">Natural & Pure</span>
             </div>
           </Link>
 
-          {/* Center Navigation */}
-          <nav className="hidden md:flex items-center space-x-8 absolute left-1/2 transform -translate-x-1/2">
-            <Link href="/shop" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors relative group">
-              Shop
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-600 transition-all duration-300 group-hover:w-full"></span>
-            </Link>
-            <Link href="/about" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors relative group">
+          {/* Right Side Navigation and Icons */}
+          <div className="flex items-center space-x-8 absolute top-6 right-6">
+            {/* About Us and Contact Links */}
+            <Link href="/about" className="text-white hover:text-green-400 font-bold text-xl transition-colors">
               About Us
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-600 transition-all duration-300 group-hover:w-full"></span>
             </Link>
-            <Link href="/contact" className="text-gray-700 hover:text-emerald-600 font-medium transition-colors relative group">
+            <Link href="/contact" className="text-white hover:text-green-400 font-bold text-xl transition-colors">
               Contact
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-emerald-600 transition-all duration-300 group-hover:w-full"></span>
             </Link>
-          </nav>
-
-          {/* Search Bar */}
-          <div className="hidden lg:flex items-center flex-1 max-w-md mx-8">
-            <form onSubmit={handleSearch} className="relative w-full">
-              <Input
-                type="text"
-                placeholder="Search for natural products..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 w-full border-2 border-gray-200 focus:border-emerald-500 rounded-full"
-              />
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            </form>
-          </div>
-
-          {/* Right Side Icons */}
-          <div className="flex items-center space-x-4">
-            {/* Search Icon for Mobile */}
-            <Button variant="ghost" size="sm" className="lg:hidden">
-              <Search className="h-5 w-5" />
-            </Button>
 
             {/* Wishlist */}
             {isClient && isAuthenticated && (
               <Link href="/wishlist">
-                <Button variant="ghost" size="sm" className="relative">
-                  <Heart className="h-5 w-5" />
+                <Button variant="ghost" size="lg" className="relative text-white hover:text-green-400">
+                  <Heart className="h-7 w-7" />
                 </Button>
               </Link>
             )}
 
             {/* Cart */}
             <Link href="/cart">
-              <Button variant="ghost" size="sm" className="relative">
-                <ShoppingCart className="h-5 w-5" />
+              <Button variant="ghost" size="lg" className="relative text-white hover:text-green-400">
+                <ShoppingCart className="h-7 w-7" />
                 {isClient && cartItemsCount > 0 && (
                   <Badge className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs bg-emerald-600">
                     {cartItemsCount}
@@ -154,8 +124,8 @@ export function Header() {
             {isClient && isAuthenticated ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <User className="h-5 w-5" />
+                  <Button variant="ghost" size="lg" className="text-white hover:text-green-400">
+                    <User className="h-7 w-7" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
