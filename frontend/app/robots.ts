@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: ["/admin/", "/api/"],
     },
-    sitemap: "https://foreststore.com/sitemap.xml",
+    sitemap: "https://wellnest.com/sitemap.xml",
   }
 }

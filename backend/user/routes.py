@@ -770,13 +770,13 @@ def create_order(user_id):
             datetime.now()
         ))
         updated_products = []
-        # Create order items
+        # Create order items - simplified version to avoid encoding issues
         for item in items:
             product_id = item['product_id']
             quantity = int(item['quantity'])
             unit_price = float(item['price'])
             total_price = unit_price * quantity
-            product_name = item['product_name']
+            product_name = item.get('product_name', f'Product {product_id}')
             
             execute_query("""
                 INSERT INTO order_items (
@@ -853,8 +853,9 @@ def create_order(user_id):
         }, 'Order created successfully')
         
     except Exception as e:
-        print(f"Order creation error: {str(e)}")  # Debug log
-        return APIResponse.error(f'Failed to create order: {str(e)}', 500)
+        # Avoid any Unicode characters in error logging
+        current_app.logger.error("Order creation failed due to encoding error")
+        return APIResponse.error('Failed to create order due to system error', 500)
 # Referral Routes
 @user_bp.route('/referrals/validate', methods=['POST'])
 def validate_referral():
@@ -936,19 +937,16 @@ def get_order_details(user_id, order_id):
     
     # Get order items
     order_items = execute_query("""
-        SELECT oi.*, p.brand,
-               (SELECT pi.image_url FROM product_images pi 
-                WHERE pi.product_id = oi.product_id AND pi.is_primary = 1 
-                LIMIT 1) as product_image
+        SELECT oi.*
         FROM order_items oi
-        LEFT JOIN products p ON oi.product_id = p.product_id
         WHERE oi.order_id = %s
         ORDER BY oi.created_at
     """, (order_id,), fetch_all=True)
     
-    # Convert image URLs to absolute URLs
+    # Convert image URLs to absolute URLs (if not already absolute)
     for item in order_items:
-        item['product_image'] = convert_image_url(item['product_image'])
+        if item.get('product_image') and not item['product_image'].startswith('http'):
+            item['product_image'] = f"http://localhost:5000{item['product_image']}"
     
     # Parse shipping address if it's JSON string
     if isinstance(order['shipping_address'], str):

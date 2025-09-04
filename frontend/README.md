@@ -1,4 +1,4 @@
-# Forest Store - E-commerce Frontend
+# WellNest - E-commerce Frontend
 
 A modern, production-ready e-commerce frontend built with Next.js 14, TypeScript, and Tailwind CSS.
 
@@ -35,7 +35,7 @@ A modern, production-ready e-commerce frontend built with Next.js 14, TypeScript
    Update `.env.local` with your configuration:
    \`\`\`env
    NEXT_PUBLIC_API_URL=http://localhost:5000/api
-   NEXT_PUBLIC_APP_NAME=Forest Store
+   NEXT_PUBLIC_APP_NAME=WellNest
    NEXT_PUBLIC_APP_URL=http://localhost:3000
    \`\`\`
 

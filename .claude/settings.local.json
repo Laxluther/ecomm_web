@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(/S:\\web\\frontend\\lib/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

@@ -1,9 +1,27 @@
+import os
+import sys
+import locale
+
+# Set UTF-8 encoding for Windows compatibility
+if sys.platform.startswith('win'):
+    try:
+        # Try to set UTF-8 locale
+        locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+    except locale.Error:
+        try:
+            # Fallback for Windows
+            locale.setlocale(locale.LC_ALL, '')
+        except locale.Error:
+            pass
+    
+    # Set environment variables for UTF-8
+    os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 from flask import Flask, send_from_directory
 from flask_cors import CORS
 from flask_caching import Cache
 from config import get_config
 from websocket_manager import WebSocketManager  # ADD THIS IMPORT
-import os
 # ADD THESE IMPORTS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address

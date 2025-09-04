@@ -10,20 +10,20 @@ interface SEOProps {
 }
 
 export function generateSEO({
-  title = "Forest Store - Premium Natural Products",
+  title = "WellNest - Premium Natural Products",
   description = "Discover premium natural products including pure honey, organic coffee, nuts, and super seeds. Quality guaranteed, sourced directly from nature.",
   keywords = ["natural products", "honey", "coffee", "nuts", "seeds", "organic", "premium"],
   image = "/images/og-image.jpg",
-  url = "https://foreststore.com",
+  url = "https://wellnest.com",
   type = "website",
 }: SEOProps = {}): Metadata {
   return {
     title,
     description,
     keywords: keywords.join(", "),
-    authors: [{ name: "Forest Store" }],
-    creator: "Forest Store",
-    publisher: "Forest Store",
+    authors: [{ name: "WellNest" }],
+    creator: "WellNest",
+    publisher: "WellNest",
     formatDetection: {
       email: false,
       address: false,
@@ -37,7 +37,7 @@ export function generateSEO({
       title,
       description,
       url,
-      siteName: "Forest Store",
+      siteName: "WellNest",
       images: [
         {
           url: image,
@@ -54,7 +54,7 @@ export function generateSEO({
       title,
       description,
       images: [image],
-      creator: "@foreststore",
+      creator: "@wellnest",
     },
     robots: {
       index: true,
@@ -76,14 +76,14 @@ export function generateSEO({
 export const structuredData = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  name: "Forest Store",
+  name: "WellNest",
   description: "Premium natural products including honey, coffee, nuts, and seeds",
-  url: "https://foreststore.com",
-  logo: "https://foreststore.com/images/logo.png",
+  url: "https://wellnest.com",
+  logo: "https://wellnest.com/images/logo.png",
   contactPoint: {
     "@type": "ContactPoint",
     telephone: "+91-9876543210",
     contactType: "customer service",
   },
-  sameAs: ["https://facebook.com/foreststore", "https://instagram.com/foreststore", "https://twitter.com/foreststore"],
+  sameAs: ["https://facebook.com/wellnest", "https://instagram.com/wellnest", "https://twitter.com/wellnest"],
 }
