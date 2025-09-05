@@ -474,12 +474,19 @@ export const adminOrdersAPI = {
 
 // Admin Referrals
 export const adminReferralsAPI = {
-  getAll: async (params?: { page?: number; per_page?: number }) => {
+  getAll: async (params?: { page?: number; per_page?: number; search?: string; status?: string }) => {
     const queryParams = new URLSearchParams()
     if (params?.page) queryParams.append("page", params.page.toString())
     if (params?.per_page) queryParams.append("per_page", params.per_page.toString())
+    if (params?.search) queryParams.append("search", params.search)
+    if (params?.status && params.status !== "all") queryParams.append("status", params.status)
 
     const response = await adminApi.get(`/referrals${queryParams.toString() ? `?${queryParams.toString()}` : ""}`)
+    return response.data
+  },
+
+  updateStatus: async (referralId: string, status: string) => {
+    const response = await adminApi.put(`/referrals/${referralId}/status`, { status })
     return response.data
   },
 }

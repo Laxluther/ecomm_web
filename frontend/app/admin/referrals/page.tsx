@@ -35,7 +35,9 @@ export default function AdminReferralsPage() {
         params.status = statusFilter
       }
       
-      return await adminReferralsAPI.getAll(params)
+      const result = await adminReferralsAPI.getAll(params)
+      console.log("Referrals API Response:", result) // Debug log
+      return result
     },
     retry: 2,
   })
@@ -132,7 +134,9 @@ export default function AdminReferralsPage() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{referralsData?.stats?.total || 0}</div>
+              <div className="text-2xl font-bold">
+                {referralsData?.referrals?.length || 0}
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -141,7 +145,9 @@ export default function AdminReferralsPage() {
               <Gift className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{referralsData?.stats?.pending || 0}</div>
+              <div className="text-2xl font-bold">
+                {referralsData?.referrals?.filter((r: any) => r.status === "pending")?.length || 0}
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -150,7 +156,9 @@ export default function AdminReferralsPage() {
               <Check className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{referralsData?.stats?.approved || 0}</div>
+              <div className="text-2xl font-bold">
+                {referralsData?.referrals?.filter((r: any) => r.status === "approved")?.length || 0}
+              </div>
             </CardContent>
           </Card>
           <Card>
@@ -159,7 +167,10 @@ export default function AdminReferralsPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">₹{referralsData?.stats?.total_rewards || 0}</div>
+              <div className="text-2xl font-bold">
+                ₹{referralsData?.referrals?.filter((r: any) => r.status === "approved")
+                  ?.reduce((sum: number, r: any) => sum + (r.reward_amount || 0), 0) || 0}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -170,7 +181,7 @@ export default function AdminReferralsPage() {
             <div className="relative flex-1 sm:w-80">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
-                placeholder="Search referrals..."
+                placeholder="Search by referrer, code, or referred user..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
