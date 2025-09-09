@@ -1,8 +1,8 @@
 class AppConstants {
   // App Information
-  static const String appName = 'WelNest';
+  static const String appName = 'WellnessNest';
   static const String appVersion = '1.0.0';
-  static const String appDescription = 'Premium Coffee & Makhana - Natural Wellness Products';
+  static const String appDescription = 'WellnessNest - Premium Coffee & Makhana - Natural Wellness Products';
 
   // API Configuration
   static const String baseUrl = 'http://localhost:5000/api';
@@ -92,7 +92,7 @@ class AppConstants {
 
   // Image Configuration
   static const String placeholderImagePath = 'assets/images/placeholder.png';
-  static const String logoImagePath = 'assets/images/welnest-logo.png';
+  static const String logoImagePath = 'assets/images/wellnessnest-logo.png';
   static const String onboardingImagesPath = 'assets/images/onboarding/';
   static const double productImageAspectRatio = 3 / 4;
   static const double bannerImageAspectRatio = 16 / 9;
@@ -143,7 +143,7 @@ class AppConstants {
 
   // Onboarding
   static const List<String> onboardingTitles = [
-    'Welcome to WelNest',
+    'Welcome to WellnessNest',
     'Premium Coffee & Makhana',
     'Track Orders & Get Rewards',
     'Natural Wellness Products',
@@ -190,73 +190,7 @@ class AppConstants {
     // More payment methods will be added later
   ];
 
-  // Real WelNest Categories (Fallback Data)
-  static const List<Map<String, dynamic>> fallbackCategories = [
-    {
-      'category_id': 1,
-      'category_name': 'Coffee',
-      'description': 'Premium roasted coffee - unflavoured and flavoured varieties for coffee lovers',
-      'image_url': '/static/uploads/categories/coffee.jpg',
-      'status': 'active',
-      'sort_order': 1,
-    },
-    {
-      'category_id': 2,
-      'category_name': 'Makhana',
-      'description': 'Crispy fox nuts - flavoured and unflavoured options, healthy snacking choice',
-      'image_url': '/static/uploads/categories/makhana.jpg',
-      'status': 'active',
-      'sort_order': 2,
-    },
-  ];
-
-  // Real WelNest Featured Products (Fallback Data)
-  static const List<Map<String, dynamic>> fallbackFeaturedProducts = [
-    {
-      'product_id': 1,
-      'product_name': 'Robusta Coffee',
-      'description': 'Premium single-origin Robusta coffee beans with bold, strong flavor and high caffeine content.',
-      'category_id': 1,
-      'brand': 'WelNest',
-      'price': 449.00,
-      'discount_price': 399.00,
-      'is_featured': true,
-      'image_url': '/static/uploads/products/robusta-coffee.jpg',
-    },
-    {
-      'product_id': 2,
-      'product_name': 'Arabica Coffee',
-      'description': 'Smooth and aromatic Arabica coffee beans with complex flavor notes and natural sweetness.',
-      'category_id': 1,
-      'brand': 'WelNest',
-      'price': 549.00,
-      'discount_price': 499.00,
-      'is_featured': true,
-      'image_url': '/static/uploads/products/arabica-coffee.jpg',
-    },
-    {
-      'product_id': 9,
-      'product_name': 'Peri Peri Makhana',
-      'description': 'Spicy and tangy fox nuts roasted to perfection with authentic peri peri seasoning.',
-      'category_id': 2,
-      'brand': 'WelNest',
-      'price': 299.00,
-      'discount_price': 249.00,
-      'is_featured': true,
-      'image_url': '/static/uploads/products/peri-peri-makhana.jpg',
-    },
-    {
-      'product_id': 12,
-      'product_name': 'Ghee Roasted Makhana',
-      'description': 'Traditional fox nuts roasted in pure desi ghee. Rich taste with natural goodness.',
-      'category_id': 2,
-      'brand': 'WelNest',
-      'price': 349.00,
-      'discount_price': 299.00,
-      'is_featured': true,
-      'image_url': '/static/uploads/products/ghee-roasted-makhana.jpg',
-    },
-  ];
+  // Note: All product and category data is now fetched from backend API only
 
   // Helper Methods
   static String getImageUrl(String? relativePath) {

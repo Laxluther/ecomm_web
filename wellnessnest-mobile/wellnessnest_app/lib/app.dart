@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 
 import 'config/theme.dart';
 import 'config/routes.dart';
@@ -75,72 +76,43 @@ class _AppInitializerState extends State<AppInitializer> {
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    _navigateImmediately();
   }
 
-  Future<void> _initializeApp() async {
-    try {
-      setState(() {
-        _initializationStatus = 'Setting up authentication...';
-      });
-
-      // Get all providers before async operations
-      final authProvider = context.read<AuthProvider>();
-      final cartProvider = context.read<CartProvider>();
-      final wishlistProvider = context.read<WishlistProvider>();
-      final productProvider = context.read<ProductProvider>();
-
-      // Initialize authentication provider
-      await authProvider.initialize();
-
-      setState(() {
-        _initializationStatus = 'Loading user preferences...';
-      });
-
-      // Initialize providers concurrently
-      await Future.wait([
-        cartProvider.initialize(authProvider.currentUser),
-        wishlistProvider.initialize(authProvider.currentUser),
-        productProvider.initialize(),
-      ]);
-
-      setState(() {
-        _initializationStatus = 'Loading categories...';
-      });
-
-      // Preload essential data
-      await productProvider.loadCategories();
-
-      setState(() {
-        _initializationStatus = 'Finalizing setup...';
-      });
-
-      // Small delay for smooth transition
-      await Future.delayed(const Duration(milliseconds: 500));
-
-    } catch (e) {
-      print('App initialization error: $e');
-      if (mounted) {
-        setState(() {
-          _initializationStatus = 'Initialization failed. Retrying...';
-        });
-        
-        // Retry after delay
-        await Future.delayed(const Duration(seconds: 2));
-        if (mounted) {
-          await _initializeApp();
-        }
-      }
-      return;
-    }
-
+  void _navigateImmediately() async {
+    // Navigate immediately without any initialization
     if (mounted) {
       setState(() {
         _isInitializing = false;
       });
 
-      // Navigate to appropriate screen
+      // Navigate to appropriate screen first
       _navigateToInitialScreen();
+
+      // Schedule provider initialization for much later with Timer
+      Timer(const Duration(milliseconds: 500), _initializeProvidersInBackground);
+    }
+  }
+
+  void _initializeProvidersInBackground() {
+    try {
+      if (!mounted) return;
+
+      // Get all providers and initialize in background
+      final authProvider = context.read<AuthProvider>();
+      final cartProvider = context.read<CartProvider>();
+      final wishlistProvider = context.read<WishlistProvider>();
+      final productProvider = context.read<ProductProvider>();
+
+      // Fire and forget - no awaiting, no blocking
+      unawaited(authProvider.initialize());
+      unawaited(cartProvider.initialize(authProvider.currentUser));
+      unawaited(wishlistProvider.initialize(authProvider.currentUser));
+      unawaited(productProvider.initialize());
+
+    } catch (e) {
+      print('Background initialization error: $e');
+      // Ignore errors - app continues to work without backend data
     }
   }
 

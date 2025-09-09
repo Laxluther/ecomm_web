@@ -117,10 +117,7 @@ class ProductProvider extends ChangeNotifier {
     } catch (e) {
       _setError(_getErrorMessage(e));
       debugPrint('Load categories error: $e');
-      
-      // Use fallback categories when API is not available
-      _loadFallbackCategories();
-      // Don't rethrow - let the app continue with fallback data
+      rethrow;
     }
   }
 
@@ -240,11 +237,8 @@ class ProductProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Load featured products error: $e');
-      // Don't show error for featured products, use cache or fallback data
+      // Try to load from cache if API fails
       await _loadFeaturedFromCache();
-      if (_featuredProducts.isEmpty) {
-        _loadFallbackFeaturedProducts();
-      }
     } finally {
       _setFeaturedLoading(false);
     }
@@ -633,34 +627,7 @@ class ProductProvider extends ChangeNotifier {
     }
   }
 
-  // Load fallback categories when API is not available
-  void _loadFallbackCategories() {
-    try {
-      _categories = AppConstants.fallbackCategories
-          .map((categoryData) => model.Category.fromJson(categoryData))
-          .toList();
-      _categoryTree = model.CategoryTree(_categories);
-      _categoriesLastFetched = DateTime.now();
-      notifyListeners();
-      debugPrint('Loaded fallback categories: ${_categories.length} categories');
-    } catch (e) {
-      debugPrint('Error loading fallback categories: $e');
-    }
-  }
-
-  // Load fallback featured products when API is not available
-  void _loadFallbackFeaturedProducts() {
-    try {
-      _featuredProducts = AppConstants.fallbackFeaturedProducts
-          .map((productData) => Product.fromJson(productData))
-          .toList();
-      _featuredLastFetched = DateTime.now();
-      notifyListeners();
-      debugPrint('Loaded fallback featured products: ${_featuredProducts.length} products');
-    } catch (e) {
-      debugPrint('Error loading fallback featured products: $e');
-    }
-  }
+  // All data is now fetched exclusively from the backend API
 
   String _getErrorMessage(dynamic error) {
     if (error is UnauthorizedException) {
